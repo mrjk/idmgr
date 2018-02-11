@@ -23,23 +23,6 @@ idm_id ()
   idm_id_ls ${@-}
 }
 
-idm_id_rm ()
-{
-  local id=${1}
-
-  # Local checks
-  idm_validate id $id || idm_exit 1 ERR "Id '$id' is not valid"
-  #idm_validate id_config $id && idm_exit 1 "Configuration '$id' already exists"
-
-
-  # Delete config
-  if [ -f "$IDM_DIR_ID/$id.env" ] ; then
-    rm "$IDM_DIR_ID/$id.env" || \
-      idm_exit 1 ERR "File '$IDM_DIR_ID/$id.env' could not be deleted"
-  else
-    idm_log WARN "File '$IDM_DIR_ID/$id.env' was already deleted"
-  fi
-}
 
 idm_id_disable()
 {
@@ -48,21 +31,6 @@ idm_id_disable()
 }
 
 idm_id_kill () { idm_id_disable ${@-}; }
-
-idm_id_get ()
-{
-  local id=${1}
-  
-  if [[ "$id" == "-" && -n "${SHELL_ID-}" ]]; then
-    echo "${SHELL_ID-}"
-    return 0
-  elif [[ "${id}" == "${SHELL_ID-}" ]]; then
-    return 0
-  else
-    return 1
-  fi
-
-}
 
 idm_id_enable()
 {
@@ -75,29 +43,26 @@ idm_id_enable()
   echo "export GIT_AUTHOR_NAME=${id}"
   echo "export GIT_AUTHOR_EMAIL=${email}"
 
-  
+  #  echo "export PATH=${XDG_OPT_HOME}/bin:$PATH"
+  #  echo "export SSH_CONFIG=${id}"
+  #  echo "export SSH_AUTH_SOCK=/tmp/ssh-S88jysAIp3qs/${id}-agent.1767"
+  #  echo "export LOGNAME=${id}"
+  #  echo "export USER=${id}"
 
-    #  # echo "export PATH=${XDG_OPT_HOME}/bin:$PATH"
-    #  #echo "export SSH_CONFIG=${id}"
-    #  #echo "export SSH_AUTH_SOCK=/tmp/ssh-S88jysAIp3qs/${id}-agent.1767"
-    #  #echo "export LOGNAME=${id}"
-    #  #echo "export USER=${id}"
+  #  echo "export GNUPGHOME=~/.config/gnupg/$id"
+  #  echo "export GPG_AGENT_INFO=..."
 
-    #  #echo "export GNUPGHOME=~/.config/gnupg/$id"
-    #  #echo "export GPG_AGENT_INFO=..."
+  #  echo "export TZ=${tz-}"
+  #  echo "export MAIL=/var/spool/mail/${id}"
+  #  echo "export LANG=en_US.utf8"
+  #  echo "export TERM=xterm-256color"
 
-    #  #echo "export TZ=${tz-}"
-    #  #echo "export MAIL=/var/spool/mail/${id}"
-    #  #echo "export LANG=en_US.utf8"
-    #  #echo "export TERM=xterm-256color"
+  #  XDG_OPT_HOME=~/opt/${id}
 
-    #  XDG_OPT_HOME=~/opt/${id}
-
-
-    #  # echo "export XDG_CONFIG_HOME=~/.config"
-    #  # echo "export XDG_DATA_HOME=~/.local/share"
-    #  # echo "export XDG_CACHE_HOME=~/.local/cache"
-    #  # echo "export XDG_OPT_HOME=$XDG_OPT_HOME"
+  #  echo "export XDG_CONFIG_HOME=~/.config"
+  #  echo "export XDG_DATA_HOME=~/.local/share"
+  #  echo "export XDG_CACHE_HOME=~/.local/cache"
+  #  echo "export XDG_OPT_HOME=$XDG_OPT_HOME"
 }
 
 idm_id_new ()
@@ -138,6 +103,27 @@ idm_id_show ()
 #  cat $conf | idm_log CODE
 }
 
+
+idm_id_ls ()
+{
+  local active
+
+  for id in $(idm_get all_id); do
+    
+    if [ "$id" == "${SHELL_ID-}" ]; then
+      active='*'
+    else
+      active=' '
+    fi
+
+    echo $(
+      eval "$(idm_get id_config $id)"
+      echo "$active:$id:$common_name ($email)"
+    )
+  done | column -t -s:  -o'   ' | idm_log DUMP -
+}
+
+
 idm_id_edit ()
 {
   local id=${1}
@@ -160,24 +146,21 @@ idm_id_edit ()
   cat $conf | idm_log CODE -
 }
 
-
-idm_id_ls ()
+idm_id_get ()
 {
-  local active
+  local id=${1}
 
-  for id in $(idm_get all_id); do
-    
-    if [ "$id" == "${SHELL_ID-}" ]; then
-      active='*'
-    else
-      active=' '
-    fi
+  trap '' INT TERM EXIT
+  
+  if [[ "$id" == "-" && -n "${SHELL_ID-}" ]]; then
+    echo "${SHELL_ID-}"
+    return 0
+  elif [[ "${id}" == "${SHELL_ID-}" ]]; then
+    return 0
+  else
+    return 1
+  fi
 
-    echo $(
-      eval "$(idm_get id_config $id)"
-      echo "$active:$id:$common_name ($email)"
-    )
-  done | column -t -s:  -o'   ' | idm_log DUMP -
 }
 
 idm_id_dump ()
@@ -203,4 +186,21 @@ idm_id_template ()
   echo "email="
   echo "tz=$tz"
 
+}
+idm_id_rm ()
+{
+  local id=${1}
+
+  # Local checks
+  idm_validate id $id || idm_exit 1 ERR "Id '$id' is not valid"
+  #idm_validate id_config $id && idm_exit 1 "Configuration '$id' already exists"
+
+
+  # Delete config
+  if [ -f "$IDM_DIR_ID/$id.env" ] ; then
+    rm "$IDM_DIR_ID/$id.env" || \
+      idm_exit 1 ERR "File '$IDM_DIR_ID/$id.env' could not be deleted"
+  else
+    idm_log WARN "File '$IDM_DIR_ID/$id.env' was already deleted"
+  fi
 }
