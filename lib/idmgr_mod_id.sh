@@ -67,7 +67,7 @@ idm_id_enable()
 
 idm_id_new ()
 {
-  local id=${1}
+  local id=${2:-$1}
 
   # Local checks
   idm_validate id $id || idm_exit 1 "Id '$id' is not valid"
@@ -123,7 +123,7 @@ idm_id_ls ()
     # Parse the config
     echo $(
       eval "$(idm_get id_config $id)"
-      echo "$active:$id:${common_name-} (${email-})"
+      echo "$active:$id::::${common_name-} (${email-})"
     )
   done | column -t -s:  -o' ' | idm_log DUMP -
 }

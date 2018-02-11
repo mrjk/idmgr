@@ -5,7 +5,7 @@ IDM_MOD_DEPS="id pass gpg ssh"
 ## Prompt functions
 ##########################################
 
-SHELL_PS1="${SHELL_PS1:-[\\u@\\h \\W]\\$ }"
+#SHELL_PS1="${SHELL_PS1:-${PS1}"
 
 idm_ps1 ()
 {
@@ -40,24 +40,19 @@ idm_ps1_help ()
 idm_ps1_enable ()
 {
   local id=${1}
-
-# \033]00m\]   # for shell
-#\[\033]01;31m\] for ps1
-
-
   id="\[\033[0;34m\]($id)\[\033[00m\]"
-  PS1="$id ${PS1:-$SHELL_PS1}"
-  echo "export PS1='$PS1'"
-  echo "export SHELL_PS1='$PS1'"
+  echo "export PS1=\"$id \${IDM_SHELL_PS1}\""
+
+  # Notes about colors:
+  #   \033]00m\]   # for shell
+  #   \[\033]01;31m\] for ps1
+
 }
 
 idm_ps1_disable ()
 {
-  local id=${1}
-  PS1=$( sed "s/$id[^a-z]* //" <<<${PS1:-$SHELL_PS1} )
-  PS1='[\u@\h \W]\$ '
-  echo "export PS1='$PS1'"
-  echo "export SHELL_PS1='$PS1'"
+  echo "export PS1=\"\${IDM_SHELL_PS1}\""
+  return
 }
 
 idm_ps1_kill () { idm_ps1_disable ${@-}; }

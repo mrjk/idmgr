@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export IDM_SHELL_PS1=${IDM_SHELL_PS1:-${PS1-}}
 IDM_SRC_WORDS=${IDM_SRC_WORDS-}
 IDM_BIN=${IDM_BIN:-idmgr}
 

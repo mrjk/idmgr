@@ -168,7 +168,7 @@ idm_get ()
     ;;
 
     id_config)
-      if [ -f "$value" ]; then
+      if [ -f "$IDM_DIR_ID/$value.env" ]; then
         echo "id=$value"
         cat $IDM_DIR_ID/$value.env
       else
@@ -193,7 +193,9 @@ idm_validate ()
         [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return
     ;;
     id_config)
-      [[ -f "$IDM_DIR_ID/$value.env" ]] && return
+      if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
+        return 0
+      fi
     ;;
     is_enabled)
       [ ! -z "${SHELL_ID}" ] && return
@@ -520,7 +522,7 @@ idm_menu_main ()
       id=$1
     elif idm_validate id_config ${2-} ; then
       menu=core
-      action=ls
+      action=$1
       id=$2
       shift 2 && opt=${@} || true
     elif idm_validate id_config ${3-} ; then
@@ -574,8 +576,7 @@ idm_menu_main ()
     return $?
   fi
 
-  idm_log DEBUG "menu=$menu action=$action id=$id opt=$opt"
-  idm_exit 1 "Command not matched"
+  idm_exit 1 "Command not matched: menu=$menu action=$action id=$id opt=$opt"
 
 
 }
