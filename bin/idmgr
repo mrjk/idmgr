@@ -168,8 +168,10 @@ idm_get ()
     ;;
 
     id_config)
-      echo "id=$value"
-      cat $IDM_DIR_ID/$value.env
+      if [ -f "$value" ]; then
+        echo "id=$value"
+        cat $IDM_DIR_ID/$value.env
+      fi
     ;;
 
     *)
