@@ -164,13 +164,15 @@ idm_get ()
     ;;
 
     all_id_files)
-      ls $IDM_DIR_ID/*.env
+      ls $IDM_DIR_ID/*.env || true
     ;;
 
     id_config)
       if [ -f "$value" ]; then
         echo "id=$value"
         cat $IDM_DIR_ID/$value.env
+      else
+        return 1
       fi
     ;;
 
