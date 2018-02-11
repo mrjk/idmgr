@@ -43,10 +43,11 @@ idm_init ()
   export EDITOR=${EDITOR:-vim}
 
   # App variables
-  IDM_CONFIG_DIR=${XDG_CONFIG_HOME:-~/.config}/idmgr
+  IDM_CONFIG_DIR=${IDM_CONFIG_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
 
   IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
   IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
+  IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
   
   # Create directories
   mkdir -p $IDM_CONFIG_DIR $IDM_DIR_ID
@@ -255,12 +256,73 @@ idm_exit_trap ()
   idm_log DEBUG "Exit trap"
 }
 
-idem_reverse_doted_list ()
+idm_reverse_doted_list ()
 {
   local list=$1
   awk 'BEGIN{FS=OFS=":"} {s=$NF; for (i=NF-1; i>=1; i--) s = s OFS $i; print s}' <<<"$list"
 }
 
+
+idm_parse_filerules ()
+{
+  local id=$1
+  local f=$2
+  #set -x
+
+  local YADM_ENCRYPT="$2"
+
+  ENCRYPT_INCLUDE_FILES=()
+  ENCRYPT_EXCLUDE_FILES=()
+
+  #cd_work "Parsing encrypt" || return
+  cd ~
+
+  exclude_pattern="^!(.+)"
+  if [ -f "$YADM_ENCRYPT" ] ; then
+    #; parse both included/excluded
+    while IFS='' read -r line || [ -n "$line" ]; do
+      if [[ ! $line =~ ^# && ! $line =~ ^[[:space:]]*$ ]] ; then
+        local IFS=$'\n'
+        for pattern in $line; do
+          if [[ "$pattern" =~ $exclude_pattern ]]; then
+            for ex_file in ${BASH_REMATCH[1]}; do
+              for f in $( find $ex_file -type f ); do
+              #if [ -e "$ex_file" ]; then
+                ENCRYPT_EXCLUDE_FILES+=("$f")
+              #fi
+              done
+            done
+          else
+            for in_file in $pattern; do
+              for f in $( find $in_file -type f ); do
+              #if [ -e "$in_file" ]; then
+                ENCRYPT_INCLUDE_FILES+=("$f")
+              #fi
+              done
+            done
+          fi
+        done
+      fi
+    done < "$YADM_ENCRYPT"
+
+    #; remove excludes from the includes
+    #(SC2068 is disabled because in this case, we desire globbing)
+    FINAL_INCLUDE=()
+    #shellcheck disable=SC2068
+    for included in "${ENCRYPT_INCLUDE_FILES[@]}"; do
+      skip=
+      #shellcheck disable=SC2068
+      for ex_file in ${ENCRYPT_EXCLUDE_FILES[@]}; do
+        [ "$included" == "$ex_file" ] && { skip=1; break; }
+      done
+      [ -n "$skip" ] || FINAL_INCLUDE+=("$included")
+    done
+    ENCRYPT_INCLUDE_FILES=("${FINAL_INCLUDE[@]}")
+
+    echo "${ENCRYPT_INCLUDE_FILES[@]}"
+  fi
+
+}
 
 ## IDM Internal
 ##########################################
@@ -381,7 +443,7 @@ idm_core_disable ()
   idm_is_enabled $id
 
   # Reverse module unloading
-  IDM_MOD_ORDER="$( idem_reverse_doted_list $IDM_MOD_ORDER )" 
+  IDM_MOD_ORDER="$( idm_reverse_doted_list $IDM_MOD_ORDER )" 
 
   # Loop over disable functions
   (
@@ -408,7 +470,7 @@ idm_core_kill ()
   idm_is_enabled $id
 
   # Reverse module killing
-  IDM_MOD_ORDER="$( idem_reverse_doted_list $IDM_MOD_ORDER )" 
+  IDM_MOD_ORDER="$( idm_reverse_doted_list $IDM_MOD_ORDER )" 
 
   # Kill all modules
   (
@@ -620,3 +682,5 @@ idm_menu_main $@
     # echo "export NPM_CONFIG_USERCONFIG=~/.config/npmrc"
     # echo "export VAGRANT_HOME=${XDG_OPT_HOME}/vagrant"
     # echo "export GOPATH=${XDG_OPT_HOME}/go"
+
+
