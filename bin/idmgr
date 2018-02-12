@@ -54,6 +54,7 @@ idm_init ()
 
   IDM_MOD_FILES=$(idm_mod_files)
   IDM_MOD_ORDER=$(idm_mod_list)
+  export IDM_TIMEOUT_USER=10
 
   # Load modules
   for i in $IDM_MOD_FILES ; do
@@ -101,7 +102,9 @@ idm_core_help ()
 
 
 idm_log ()
-{
+{ 
+  set +x
+
   local level=$1
   shift || true
   local msg="$@"
@@ -150,6 +153,144 @@ idm_log ()
     echo "Error while log output msg: $message"
   fi
 }
+
+
+
+idm_exit ()
+{
+  set +x
+  local rc=${1:-0}
+  local msg lvl
+  
+  # Check exit status
+  if [ "$#" -eq 3 ]; then
+    lvl=${2:-DEBUG}
+    msg=${3:-}
+  else
+    lvl=DEBUG
+    msg=${2:-}
+  fi
+
+
+  if [[ "$rc" -ne 0 ]]; then
+    #idm_trace || true
+    idm_log $lvl "$msg (rc=$rc)"
+  else
+    idm_log $lvl "$msg"
+  fi
+
+  # Remove trap
+  trap "" INT TERM EXIT
+
+  # Exit for good
+  exit $rc
+}
+
+idm_trace ()
+{
+  local msg=${@}
+  local traces=
+
+  (
+    echo "Stack trace:"
+    for i in {0..10}; do
+      trace=$(caller $i 2>&1 || true )
+      if [ -z "$trace" ] ; then
+        continue
+      else
+        #idm_log DEBUG "Trace $i: $trace"
+        #traces="${traces}${trace}\n"
+        echo "$trace"
+      fi
+    done | tac | column -t 
+    [ -z "$msg" ] || echo "Trace ctx: $msg"
+  ) |  >&2  idm_log DUMP -
+}
+
+idm_exit_trap() {
+    set +x
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+      idm_trace || true
+      idm_log ERR "The script exited with exit code: $rc"
+    fi
+    exit $rc
+}
+
+
+idm__load_lib ()
+{
+  local lib_name=${1}
+  local lib_args=${@-}
+  local env_var=IDM_LIB_${lib_name^^}
+
+  #idm_log DEBUG "$env_var=${!env_var}"
+  [ -z "${!env_var-}" ] ||  return 0
+
+  cmd="$(command -v $lib_name || true )"
+
+  if [ -x "${cmd:-_}" ]; then
+
+    . "$cmd" $lib_args 
+    declare -g $env_var=$cmd
+    idm_log INFO "Loaded lib: $env_var=${!env_var}"
+    #set -x
+
+  else
+    idm_exit 1 "Could not find 'safe' executable in \$PATH (missing module dependency)"
+  fi
+}
+
+# This function display a user skippable timeout.
+idm_cli_timeout ()
+{
+  local default_rc=${1:-1}
+  local wait_time=${2:-$IDM_TIMEOUT_USER}
+  local start=$(date '+%s')
+  local human_word go_word
+
+  # Humanise ...
+  [ "$default_rc" -ge 0 ] || default_rc=1
+  if [ "$default_rc" -eq 0 ]; then
+    human_word="abort"
+    go_word=QUIT
+  elif [ "$default_rc" -ne 0 ]; then
+    human_word="continue"
+    go_word=GO
+  fi
+
+  # Notifying user
+  local human_date="$(date -d@$wait_time -u '+%Hh%Mm%Ss' | sed 's/00.//g' )"
+  local human_msg="Type '$go_word' to $human_word ($human_date):"
+
+  # Wait user input or timeout ...
+  local answer=
+  local rc=0
+  read -t $wait_time -p "   ASK: ${human_msg} "  answer || rc=$?
+  local remaining=$(( $wait_time - ( $(date '+%s') - $start ) ))
+
+  # Make a decision
+  if [[ "$rc" -eq 142 ]]; then
+    # We timeout, so GO! (142 is the timeout return code)
+    echo
+    return $default_rc
+  elif [[ "$answer" == "$go_word" ]]; then
+    # User asked to GO!
+    return 0
+  elif [[ $remaining -le 0 ]]; then
+    # Whatever, time passed, so GO!
+    return $default_rc
+  elif [[ "$rc" -ne 0 ]]; then
+    # Hmm, something wrong, we quit with error...
+    urm_log ERROR "Something went wrong (return code=$rc)"
+    return 1
+  fi
+
+  # We loop back
+  idm_cli_timeout $default_rc $remaining 
+
+}
+
 
 idm_get ()
 {
@@ -222,39 +363,6 @@ idm_is_enabled ()
 
 }
 
-
-
-idm_exit ()
-{
-  local rc=${1:-0}
-  local msg lvl
-  
-  # Check exit status
-  if [ "$#" -eq 3 ]; then
-    lvl=${2:-DEBUG}
-    msg=${3:-}
-  else
-    lvl=DEBUG
-    msg=${2:-}
-  fi
-
-  if [[ "$rc" -ne 0 ]]; then
-    idm_log $lvl "$msg (rc=$rc)"
-  else
-    idm_log $lvl "$msg"
-  fi
-
-  # Remove trap
-  trap "" INT TERM EXIT
-
-  # Exit for good
-  exit $rc
-}
-
-idm_exit_trap ()
-{
-  idm_log DEBUG "Exit trap"
-}
 
 idm_reverse_doted_list ()
 {
@@ -347,7 +455,7 @@ idm_mod__order ()
 
         # Output
         echo -e "$( xargs -n1 -I{} echo {} "$mod_name" <<<"$IDM_MOD_DEPS" )"
-      done | tsort | xargs
+      done | tsort | grep -v 'core' | xargs
     #)
 
     #idm_log DEBUG "Dependencies order: $result"
@@ -386,7 +494,7 @@ idm_core_ls ()
     local val="idm_${i}_ls"
     idm_log NOTICE "List $i"
 
-    ${val} $id 2>/dev/null || \
+    ${val} $id || \
       {
         true
         idm_log INFO "No listing function for $i"
@@ -416,14 +524,14 @@ idm_core_enable ()
   conf="$IDM_DIR_ID/$id.env"
 
   # Notice user
-  (
+  {
     . $conf
 
     for i in ${IDM_MOD_ORDER//:/ } ; do
       local val="idm_${i}_enable"
-      #idm_log INFO "Loading $i ..."
+      idm_log INFO "Loading $i ..."
 
-      ${val} $id 2>/dev/null || \
+      ${val} $id  || \
         {
           true
           idm_log INFO "No enable function for $i"
@@ -431,7 +539,7 @@ idm_core_enable ()
       echo ""
     done
 
-  ) | idm_log CODE -
+  } | idm_log CODE -
 
   idm_log NOTICE "Identity '$id' is loaded"
 
@@ -539,11 +647,6 @@ idm_core_completion ()
 ##########################################
 
 
-idm_exit_trap() {
-    rc=$?
-    [[ $rc -ne 0 ]] && idm_log ERR "The script exited with exit code: $rc"
-    exit $rc
-}
 
 trap "idm_exit_trap" INT TERM EXIT
 

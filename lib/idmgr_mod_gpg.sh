@@ -95,6 +95,7 @@ idm_gpg__start ()
   #echo "export GPG_TTY=$GPG_TTY" > "$runtime/env"
   echo "export GNUPGHOME=$gpghome" > "$runtime/env"
   echo "export GPG_AGENT_INFO=$runtime/socket" >> "$runtime/env"
+  echo "export GPG_DEFAULT_ID=${GIT_AUTHOR_EMAIL:-$id}" >> "$runtime/env"
 
   # Start agent
   idm_log INFO "Start gpg-agent ..."
@@ -105,11 +106,110 @@ idm_gpg__start ()
 ## Extended functions
 ##########################################
 
+idm_gpg__cli_helper ()
+{
+  local id=${1}
+  local type=${2:-sub}
+  local lvl=WARN
+
+  # Autodetect name ...
+  if [ "$( wc -c <<<${GIT_AUTHOR_NAME})" -lt 5 ]; then
+    name=${GIT_AUTHOR_EMAIL}
+  else
+    name=${GIT_AUTHOR_NAME}
+  fi
+
+  idm_log NOTICE "Please follow this recommendations:"
+  if [ "$type" == "sub" ]; then
+    idm_log $lvl "You may have to enter your principal key password."
+    idm_log $lvl "Type: 6 - RSA (encrypt only)"
+  elif [ "$type" == "main" ]; then
+    idm_log $lvl "Type: 4 - RSA (sign only)"
+  fi
+
+  # Common
+
+  idm_log $lvl "Size: 4096"
+  idm_log $lvl "Type: 2y"
+
+  if [ "$type" == "main" ]; then
+
+    idm_log $lvl "Name: ${name} (must be 5 char min!)"
+    idm_log $lvl "Email: ${GIT_AUTHOR_EMAIL}"
+    idm_log $lvl "Comment: <none>"
+    idm_log $lvl "Passphrase: Very strong"
+  elif [ "$type" == "main" ]; then
+    idm_log $lvl "Type: quit and save changes"
+  fi
+
+  idm_log NOTICE "PGP key generation interface"
+
+}
+
 idm_gpg_new ()
 {
   local id=${1}
   idm_is_enabled $id
+  key="$( idm_gpg__get_def_key $id )"
 
-  gpg --gen-key
+  idm_gpg__cli_helper $id sub
+  gpg --edit-key $key addkey 
+
+  idm_log NOTICE "Your subkey $name is ready :)"
 }
 
+# Should be used for subkeys ....
+idm_gpg_init ()
+{
+  local id=${1}
+  idm_is_enabled $id
+
+  ! idm_gpg__get_def_key $id &>/dev/null || \
+    idm_exit 1 "You already have an id !"
+
+  # Generate top secret id
+  idm_gpg__cli_helper $id main
+  gpg --gen-key
+
+  # Generate encyption key
+  idm_gpg_new $id
+
+  idm_log NOTICE "Your personal key $name is ready :)"
+}
+
+idm_gpg__get_def_key ()
+{
+  key=${1}
+
+  key=$(
+    gpg2 --list-keys | grep "uid"| grep "${key:-}" \
+      | sed -E 's/[^<]*<([^>]*)>.*/\1/'
+    ) || {
+      idm_log WARN "Could not find a matching key for '$key'"
+      return 1
+    }
+
+  if [ "$( wc -l <<<"$key")" -ne 1 ]; then
+    idm_log WARN "Too much keys for matching '$1'"
+    idm_log DUMP - <<<"$key"
+    return 1
+  fi
+
+  echo "$key"
+}
+
+idm_gpg_del ()
+{
+  local id=${1}
+  local key=${2:-$1}
+
+  # Scan key
+  key=$(idm_gpg__get_def_key $key)
+
+  idm_log WARN "Do you really want to destroy the '$key' key?"
+  idm_cli_timeout 1 || rc=$?
+
+  gpg --delete-key "$key" || true
+  gpg --delete-secret-key "$key" || true
+
+}
