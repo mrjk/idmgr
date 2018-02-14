@@ -154,6 +154,12 @@ idm_log ()
   fi
 }
 
+#  export PS4='+[${SECONDS}s][${BASH_SOURCE}:${LINENO}]: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'; set -x;
+#  export PS4='.[${SECONDS}s] \[\e[36m\] ${FUNCNAME[0]:+${FUNCNAME[0]}()[${LINENO}]: }\[\e[m\]'; set -x;
+#  export PS4='. $( f="${FUNCNAME[0]:+${FUNCNAME[0]//}}"; printf "%10s:%00d %00d %10s| " ${BASH_SOURCE#$HOME/} ${LINENO} ${SECONDS} "$f")' ; set -x;
+#  export PS4='. $(f="${FUNCNAME[0]:+${FUNCNAME[0]//}}"; s=${BASH_SOURCE#$HOME/}; l=${LINENO}; t=${SECONDS}; printf "%00d %0d %16.50s()  " $l $t "$f")' ; set -x;
+#  export PS4=' \[\e[36m\]> $(f="${FUNCNAME[0]:+${FUNCNAME[0]//}}"; s=${BASH_SOURCE#$HOME/}; l=${LINENO}; t=${SECONDS}; printf "%00d %0d %s():" $l $t "$f")\[\e[m\]\n' ; set -x;
+  #export LOG="idm_log_wrap \$FUNCNAME "
 
 
 idm_exit ()
@@ -161,6 +167,9 @@ idm_exit ()
   set +x
   local rc=${1:-0}
   local msg lvl
+  #[ -p /dev/stdin ] \
+  #  && dump="$(</dev/stdin)" \
+  #  || dump=""
   
   # Check exit status
   if [ "$#" -eq 3 ]; then
@@ -175,6 +184,8 @@ idm_exit ()
   if [[ "$rc" -ne 0 ]]; then
     #idm_trace || true
     idm_log $lvl "$msg (rc=$rc)"
+    #[ -z "$dump"  ] || \
+    #  idm_log DUMP "$dump"
   else
     idm_log $lvl "$msg"
   fi
@@ -207,14 +218,32 @@ idm_trace ()
   ) |  >&2  idm_log DUMP -
 }
 
-idm_exit_trap() {
+idm_exit_trap () {
     set +x
     rc=$?
     if [[ $rc -ne 0 ]]; then
-      idm_trace || true
       idm_log ERR "The script exited with exit code: $rc"
+      idm_trace || true
+    #else
+    #  idm_log WARN  "The script exit has been trapped !"
+    #  idm_trace || true
     fi
     exit $rc
+}
+
+
+idm_require_bin () {
+  local bin=$1
+  shift 1 || true
+  local opts=${@-}
+
+  if command -v "$bin" &> /dev/null; then
+    declare -g ${bin^^}="$bin $opts"
+    return 0
+  else
+    idm_log ERR "Missing '$bin'"
+    return 1
+  fi
 }
 
 
@@ -332,7 +361,7 @@ idm_validate ()
   case $type in
     id)
       [ "$value" != '_' ] && \
-        [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return
+        [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return $?
     ;;
     id_config)
       if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
@@ -340,10 +369,10 @@ idm_validate ()
       fi
     ;;
     is_enabled)
-      [ ! -z "${SHELL_ID}" ] && return
+      [ ! -z "${SHELL_ID}" ] && return $?
     ;;
     is_disabled)
-      [ -z "${SHELL_ID}" ] && return
+      [ -z "${SHELL_ID}" ] && return $?
     ;;
       
     *)
@@ -732,12 +761,12 @@ idm_menu_main ()
   esac
 
   # Dispatch
-  #idm_log DEBUG "menu=$menu action=$action id=$id opt=$opt"
-  if  [ "$( type -t idm_${menu}_${action} )" = function ]; then
-    idm_${menu}_${action} $id $opt
+  #idm_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
+  if  [ "$( type -t idm_${menu}_${action:-_} )" = function ]; then
+    idm_${menu}_${action:-_} $id $opt
     return $?
   elif  [ "$( type -t idm_${menu} )" = function ]; then
-    idm_${menu} ${action} $id $opt
+    idm_${menu} ${action:-_} $id $opt
     return $?
   fi
 

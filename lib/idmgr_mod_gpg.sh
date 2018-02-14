@@ -213,3 +213,34 @@ idm_gpg_del ()
   gpg --delete-secret-key "$key" || true
 
 }
+
+
+
+# Source: https://github.com/roddhjav/pass-tomb/blob/master/tomb.bash
+# $@ is the list of all the recipient used to encrypt a tomb key
+idm_gpg__is_valid_recipients() {
+	typeset -a recipients
+	recipients=($@)
+
+	# All the keys ID must be valid (the public keys must be present in the database)
+	for gpg_id in "${recipients[@]}"; do
+		gpg --list-keys "$gpg_id" &> /dev/null
+		if [[ $? != 0 ]]; then
+			idm_log ERR "${gpg_id} is not a valid key ID."
+			return 1
+		fi
+	done
+}
+
+idm_gpg__is_valid_key() {
+	typeset -a recipients
+	recipients=($@)
+	# At least one private key must be present
+	for gpg_id in "${recipients[@]}"; do
+		gpg --list-secret-keys "$gpg_id" &> /dev/null
+		if [[ $? = 0 ]]; then
+			return 0
+		fi
+	done
+	return 1
+}
