@@ -338,6 +338,8 @@ lib_gpg_encrypt_dir ()
     fi
   fi
 
+  #set -x
+
   # Encrypt all the stuffs
   $TAR -C "${src%/*}" -cz "${src##*/}" 2>/dev/null | \
     $GPG -a $gpg_opts --yes -o $dst || \

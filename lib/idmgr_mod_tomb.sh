@@ -157,11 +157,11 @@ idm_tomb__push ()
   # Manage argument
   if grep -sq "$arg" $IDM_CONFIG_DIR/git/$id/known_hosts ; then
 
-    arg=$( grep -sq "$arg" $IDM_CONFIG_DIR/git/$id/known_hosts | head -n 1 )
+    arg=$( grep -s "$arg" $IDM_CONFIG_DIR/git/$id/known_hosts | head -n 1 )
 
     idm_tomb_ssh_sync $arg ||
       idm_exit 1 "Could not copy tomb to $arg"
-    lib_log NOTICE "Tomb has been exported: $arg:$dst/$id.tomb"
+    lib_log NOTICE "Tomb has been exported: to $arg"
     
   elif [ "$arg" == 'all' ]; then
     remotes="$(_git_tomb remote -v | awk '{ print $1 }' | uniq )"
@@ -258,10 +258,12 @@ idm_tomb__encrypt ()
   idm_tomb__sync $id ||
     idm_exit 1 ERR "Failed to push commits to tomb repo"
 
+  #set -x
   # Encrypt tomb data
-  lib_gpg_encrypt_dir $git_tomb_dir $git_tomb_enc || \
+  lib_gpg_encrypt_dir $git_tomb_dir $git_tomb_enc _PASS || \
     idm_exit 1 ERR "Failed to create tomb"
 
+  #set -x
   ## Encrypt local data
   lib_gpg_encrypt_dir $git_local_dir $git_local_enc $GIT_AUTHOR_EMAIL || \
     idm_exit 1 ERR "Could not create local repo data"
@@ -280,7 +282,7 @@ idm_tomb__decrypt ()
 
   # Sanity check
   idm_tomb_require_enabled $id
-  idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue"
+  #idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue"
 
 
   # Check if tomb repo is absent
