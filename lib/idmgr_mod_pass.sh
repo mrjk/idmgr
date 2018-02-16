@@ -11,7 +11,7 @@ idm_pass ()
   #set -x
   if [ "$#" -eq 1 ]; then
     local id=$1
-    idm_pass_ls $id
+    idm_pass__ls $id
     return 0
   else
     local action=$1
@@ -28,15 +28,15 @@ idm_pass ()
 
 }
 
-idm_pass_ls ()
+idm_pass__ls ()
 {
   local id=${1}
-  idm_is_enabled $id
+  idm_validate is_enabled $id || return 0
 
-  PASSWORD_STORE_DIR=~/.config/pass/${id} pass ls
+  PASSWORD_STORE_DIR=~/.config/pass/${id} pass ls | sed 's/^/  /'
 }
 
-idm_pass_help ()
+idm_pass__help ()
 {
   echo "Standard UNIX Password Manager"
   printf "  %-20s: %s\n" "pass ls" "List passwords"
@@ -49,19 +49,19 @@ idm_pass_help ()
 
 }
 
-idm_pass_enable ()
+idm_pass__enable ()
 {
   local id=${1}
-  idm_is_enabled $id
+  ! idm_validate id_config $id
   
   echo "export PASSWORD_STORE_DIR=~/.config/pass/${id}"
 }
 
 
-idm_pass_disable ()
+idm_pass__disable ()
 {
   local id=${1}
-  idm_is_enabled $id
+  idm_validate id_config $id
 
   echo "unset PASSWORD_STORE_DIR"
 }

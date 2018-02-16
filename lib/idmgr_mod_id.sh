@@ -6,7 +6,7 @@ IDM_MOD_DEPS=""
 ##########################################
 
 
-idm_id_help ()
+idm_id__help ()
 {
   echo "Identity management:"
   printf "  %-20s: %s\n" "id ls" "List all disks of all policies"
@@ -20,19 +20,19 @@ idm_id_help ()
 
 idm_id ()
 {
-  idm_id_ls ${@-}
+  idm_id__ls ${@-}
 }
 
 
-idm_id_disable()
+idm_id__disable()
 {
   # Disable internal variables
-  echo "unset SHELL_ID GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL" | idm_log CODE -
+  echo "unset SHELL_ID GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL" | lib_log CODE -
 }
 
-idm_id_kill () { idm_id_disable ${@-}; }
+idm_id__kill () { idm_id__disable ${@-}; }
 
-idm_id_enable()
+idm_id__enable()
 {
   local id=${1}
   local conf="$IDM_DIR_ID/$id.env"
@@ -65,7 +65,7 @@ idm_id_enable()
   #  echo "export XDG_OPT_HOME=$XDG_OPT_HOME"
 }
 
-idm_id_new ()
+idm_id__new ()
 {
   local id=${2:-$1}
 
@@ -81,12 +81,12 @@ idm_id_new ()
   $EDITOR "$conf"
 
   # Notice user
-  idm_log NOTICE "Id '$id' has been created:"
-  cat $conf | idm_log CODE -
+  lib_log NOTICE "Id '$id' has been created:"
+  cat $conf | lib_log CODE -
 }
 
 
-idm_id_show ()
+idm_id__show ()
 {
   local id=${1}
   local conf
@@ -98,15 +98,16 @@ idm_id_show ()
   conf="$IDM_DIR_ID/$id.env"
 
   # Notice user
-  idm_log INFO "Id '$id' configuration:"
-  idm_get id_config $id | idm_log CODE -
-#  cat $conf | idm_log CODE
+  lib_log INFO "Id '$id' configuration:"
+  idm_get id_config $id | lib_log CODE -
+#  cat $conf | lib_log CODE
 }
 
 
-idm_id_ls ()
+idm_id__ls ()
 {
   local active
+  #set -x
 
   for id in $(idm_get all_id); do
 
@@ -125,11 +126,11 @@ idm_id_ls ()
       eval "$(idm_get id_config $id)"
       echo "$active:$id::::${common_name-} (${email-})"
     )
-  done | column -t -s:  -o' ' | idm_log DUMP -
+  done | column -t -s:  -o' ' #| lib_log DUMP -
 }
 
 
-idm_id_edit ()
+idm_id__edit ()
 {
   local id=${1}
   local md5 conf
@@ -144,14 +145,14 @@ idm_id_edit ()
 
   # Notice user
   if [[ "$md5" == "$(md5sum $conf)" ]] ;then
-    idm_log INFO "Id '$id' has not been updated:"
+    lib_log INFO "Id '$id' has not been updated:"
   else
-    idm_log NOTICE "Id '$id' has been updated:"
+    lib_log NOTICE "Id '$id' has been updated:"
   fi
-  cat $conf | idm_log CODE -
+  cat $conf | lib_log CODE -
 }
 
-idm_id_get ()
+idm_id__get ()
 {
   local id=${1}
 
@@ -168,14 +169,14 @@ idm_id_get ()
 
 }
 
-idm_id_dump ()
+idm_id__dump ()
 {
   for id in $(idm_get all_id); do
-    #idm_log NOTICE "Identity $id"
+    #lib_log NOTICE "Identity $id"
     {
       idm_get id_config $id
       echo " " 
-    } | idm_log CODE -
+    } | lib_log CODE -
   done
 }
 
@@ -192,7 +193,7 @@ idm_id_template ()
   echo "tz=$tz"
 
 }
-idm_id_rm ()
+idm_id__rm ()
 {
   local id=${1}
 
@@ -206,6 +207,6 @@ idm_id_rm ()
     rm "$IDM_DIR_ID/$id.env" || \
       idm_exit 1 ERR "File '$IDM_DIR_ID/$id.env' could not be deleted"
   else
-    idm_log WARN "File '$IDM_DIR_ID/$id.env' was already deleted"
+    lib_log WARN "File '$IDM_DIR_ID/$id.env' was already deleted"
   fi
 }

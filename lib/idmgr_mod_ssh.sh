@@ -8,7 +8,7 @@ IDM_MOD_DEPS="id gpg"
 ## SSH functions
 ##########################################
 
-idm_ssh_help ()
+idm_ssh__help ()
 {
   echo "Secure Shell"
 #  printf "  %-20s: %s\n" "info" "Info submenu"
@@ -29,7 +29,7 @@ idm_ssh ()
   # Argument maangement
   if [ "$#" -eq 1 ]; then
     local id=$1 
-    idm_ssh_ls $id
+    idm_ssh__ls $id
     return 0
   else
     local action=$1
@@ -50,30 +50,32 @@ idm_ssh ()
 ## Required functions
 ##########################################
 
-idm_ssh_ls ()
+idm_ssh__ls ()
 {
   local id=$1
   local opt=${2:--l}
+  local opt=-l
 
-  idm_is_enabled $id
+  idm_validate is_enabled $id || return 0
 
-  { ssh-add $opt || true ; } | idm_log DUMP -
+  { ssh-add $opt || true ; } | sed 's/^/  /'
 }
 
-idm_ssh_disable ()
+idm_ssh__disable ()
 {
   local id=$1
-  idm_is_enabled $id
+  #idm_is_enabled $id
+  idm_validate id_config $id
 
   # Return portion of code to clean
   echo "unset SSH_AUTH_SOCK SSH_AGENT_PID"
 
 }
 
-idm_ssh_enable ()
+idm_ssh__enable ()
 {
   local id=$1
-  idm_is_enabled $id
+  idm_validate id_config $id
 
   # Source environment
   if [ -f "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" ] ; then
@@ -85,7 +87,7 @@ idm_ssh_enable ()
   # Check status
   if ! idm_ssh__is_agent_working $id ${SSH_AUTH_SOCK:-_} ${SSH_AGENT_PID:-0}; then
     if ! idm_ssh__agent_start $id; then
-        idm_log WARN "Could not start ssh agent :("
+        lib_log WARN "Could not start ssh agent :("
         return 1
     fi
   fi
@@ -95,7 +97,7 @@ idm_ssh_enable ()
 }
 
 # LOGOUT
-idm_ssh_kill () {
+idm_ssh__kill () {
 
   #set -x
 
@@ -104,7 +106,7 @@ idm_ssh_kill () {
 
   idm_is_enabled $id
 
-  #idm_log NOTICE "Cleaning ssh-agent ..."
+  #lib_log NOTICE "Cleaning ssh-agent ..."
 
   [ -z "${SSH_AGENT_PID-}" ] && \
     [ -f "$run_dir/env" ] && \
@@ -113,7 +115,7 @@ idm_ssh_kill () {
   # Clean ssh-agent process
   if kill -0 ${SSH_AGENT_PID-} &>/dev/null; then
     /usr/bin/ssh-agent -k >/dev/null 
-    idm_log NOTICE "Kill ssh-agent ..."
+    lib_log NOTICE "Kill ssh-agent ..."
   fi
     #eval "$(/usr/bin/ssh-agent -k 2>/dev/null)" 
 
@@ -122,7 +124,7 @@ idm_ssh_kill () {
     rm "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env"
 
   # Disable agent
-  idm_ssh_disable $id
+  idm_ssh__disable $id
 
   set +x
 
@@ -168,9 +170,9 @@ idm_ssh__agent_start() {
   if ssh-agent -a "$run_dir/socket" -t $life -s | grep ^SSH_ > "$run_dir/env"; then
 
     echo "$run_dir/env"
-    idm_log INFO "Start ssh-agent ..."
+    lib_log INFO "Start ssh-agent ..."
   else
-    idm_log WARN "Could not start ssh agent :("
+    lib_log WARN "Could not start ssh agent :("
     return 1
   fi
 
@@ -205,7 +207,7 @@ idm_ssh__agent_clean () {
   fi
 
   unset SSH_AUTH_SOCK SSH_AGENT_PID
-  #idm_log INFO "ssh-agent env cleaned is now clean"
+  #lib_log INFO "ssh-agent env cleaned is now clean"
 }
 
 
@@ -244,8 +246,8 @@ idm_ssh_add ()
   [ -n "$pub_keys" ] || \
     idm_exit 0 WARN "No keys found"
 
-  idm_log INFO "Adding keys:"
-  xargs -n 1 <<<$key_list | idm_log DUMP -
+  lib_log INFO "Adding keys:"
+  xargs -n 1 <<<$key_list | lib_log DUMP -
 
   echo ""
   ssh-add $key_list
@@ -269,12 +271,12 @@ idm_ssh__agent_check ()
   elif SSH_AUTH_SOCK=$socket SSH_AGENT_PID=$pid ssh-add -l &>/dev/null ; then
     return 0
   else
-    idm_log WARN "ssh-agent is not working as expected"
+    lib_log WARN "ssh-agent is not working as expected"
   fi
 
   # Is the socket valid ?
   if [ "$socket" != '_' -a ! -S "$socket" ]; then
-    idm_log WARN "Socket '$socket' is dead, can't recover ssh-agent"
+    lib_log WARN "Socket '$socket' is dead, can't recover ssh-agent"
     idm_ssh__agent_clean $id $socket 0
     return 1
   fi
@@ -283,13 +285,13 @@ idm_ssh__agent_check ()
     local pid="$( ps aux | grep "$socket" | grep -v 'grep' | head -n 1 | awk '{ print $2 }' )" || \
       pid="$( ps aux | grep "" | grep -v 'grep' | head -n 1 | awk '{ print $2 }' )" || \
         {
-          idm_log WARN "Process ssh-agent is dead, cannot recover"
+          lib_log WARN "Process ssh-agent is dead, cannot recover"
           idm_ssh__agent_clean $id $socket 0
           return 1
         }
 
     # Kill all processes
-    idm_log DEBUG "Multiple PID founds for ssh-agent: $pid"
+    lib_log DEBUG "Multiple PID founds for ssh-agent: $pid"
     q=0
     for p in $pid; do
       return
@@ -304,7 +306,7 @@ idm_ssh__agent_check ()
 
 
   # Hmm, we should not arrive here ...
-  idm_log WARN "ssh-agent is in a really weird state :/"
+  lib_log WARN "ssh-agent is in a really weird state :/"
   return 1
 
 }

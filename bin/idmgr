@@ -1,12 +1,6 @@
 #!/bin/bash
 
 
-## Documentation
-##########################################
-# This script handles many identity
-
-
-
 ## Initialisation
 ##########################################
 
@@ -32,29 +26,27 @@ IDM_DATE='03/01/18'
 IDM_LICENSE='MIT'
 IDM_SCRIPT_NAME=idmgr
 
-
-
+# Global app variables
+IDM_BIN=${IDM_BIN:-$0}
 IDM_DIR_ROOT=${IDM_DIR_ROOT:-$( realpath "$(dirname $0)/../" )}
+
+IDM_CONFIG_DIR=${IDM_CONFIG_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
+IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
+IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
+IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
 
 # Main initialisation settings
 idm_init ()
 {
   export EDITOR=${EDITOR:-vim}
-
-  # App variables
-  IDM_CONFIG_DIR=${IDM_CONFIG_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
-
-  IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
-  IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
-  IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
   
   # Create directories
   mkdir -p $IDM_CONFIG_DIR $IDM_DIR_ID
 
   IDM_MOD_FILES=$(idm_mod_files)
   IDM_MOD_ORDER=$(idm_mod_list)
-  export IDM_TIMEOUT_USER=10
+  export IDM_TIMEOUT_USER=5
 
   # Load modules
   for i in $IDM_MOD_FILES ; do
@@ -63,7 +55,11 @@ idm_init ()
 }
 
 
-idm_core_help ()
+## Required functions
+##########################################
+
+
+idm_core__help ()
 {
   echo ""
   echo "  idmgr - Identity Manager for your shell"
@@ -72,95 +68,265 @@ idm_core_help ()
   echo "  Identity Manager can manage your ssh keys, your pass,"
   echo "  your pgp keys, kerberos and many other related identity item."
   echo ""
-  echo "Core commands:"
+  echo "Sourced commands:"
   printf "  %-20s: %s\n" "enable <id>" "Enable (and start) id"
-  printf "  %-20s: %s\n" "disable <id>" "Disable id"
-  printf "  %-20s: %s\n" "kill <id>" "Kill id and its associated processes"
+  printf "  %-20s: %s\n" "disable id" "Disable id"
+  printf "  %-20s: %s\n" "kill id" "Kill id and its associated processes"
+  printf "  %-20s: %s\n" "shell " "Show bash code"
+  printf "  %-20s: %s\n" "comp " "Show completion code"
   echo 
+  echo "Other commands:"
+  printf "  %-20s: %s\n" "id " "List all id"
+  printf "  %-20s: %s\n" "shred [id|user|dev|ask]" "Safely schred data (definitive)"
+  printf "  %-20s: %s\n" "fun " "Show internal function (debug)"
+  printf "  %-20s: %s\n" "hier " "Show cli function (debug)"
 
-  for i in ${IDM_MOD_ORDER//:/ } ; do
-    local val="idm_${i}_help"
-    echo -n "$i: "
-    ${val} 2>/dev/null || \
-      {
-        true
-        echo "No help"
-      }
-    echo ""
-  done
+  idm_core_exec_mod $id __help "\n%s" ${IDM_MOD_ORDER//:/ } 
 
-  echo "License:"
+  echo
+  lib_log NOTICE "License:"
   echo "  $IDM_VERSION, $IDM_DATE"
   echo "  $IDM_LICENSE, $IDM_AUTHORS"
 
 }
 
+idm_core__ls ()
+{
+  local id=${1}
+  #set -x
+
+  idm_core_exec_mod $id __ls "\n%s ls" ${IDM_MOD_ORDER//:/ } 
+
+}
 
 
-## Utils
+idm_core__enable ()
+{
+  local id=${1:-${SHELL_ID-}}
+  local conf
+
+  #set -x
+
+  # Local checks
+  idm_validate id $id || idm_exit 1 ERR "You must provide an id"
+  idm_validate id_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
+
+  # Check if workspace is enabled
+  #idm_validate is_enabled $id 
+  if [ "${SHELL_ID-}" == "$id" ]; then
+    #idm_exit 0 INFO "Your workspace is already activated"
+    lib_log WARN "Your workspace is already activated"
+  elif [ -n "${SHELL_ID-}" ]; then
+    idm_exit 0 WARN "Your workspace is already activated with $SHELL_ID"
+  fi
+
+  # Retrieve environment config
+  conf="$IDM_DIR_ID/$id.env"
+
+  # Notice user
+  {
+    . $conf
+    idm_core_exec_mod $id __enable "Enabling %s ..." ${IDM_MOD_ORDER//:/ }
+  } # | lib_log DUMP -
+
+  lib_log NOTICE "Identity '$id' is loaded"
+
+}
+
+idm_core__disable ()
+{
+  local id=${1}
+  #idm_is_enabled $id
+  idm_validate is_enabled $id
+
+  # Reverse module unloading
+  IDM_MOD_ORDER="$( lib_reverse_doted_list $IDM_MOD_ORDER )" 
+  idm_core_exec_mod $id __disable "Disabling %s ..." ${IDM_MOD_ORDER//:/ } 
+
+  # Inform user
+  lib_log NOTICE "Id $id is disabled"
+}
+
+idm_core__kill ()
+{
+  local id=${1}
+  idm_is_enabled $id
+
+  # Reverse module killing
+  IDM_MOD_ORDER="$( lib_reverse_doted_list $IDM_MOD_ORDER )" 
+  idm_core_exec_mod $id __disable "Killing %s ..." ${IDM_MOD_ORDER//:/ } 
+
+  # Inform user
+  lib_log NOTICE "Id $id is safely killed"
+
+}
+
+
+idm_core__shell ()
+{
+  IDM_SRC_WORDS=$( $IDM_DIR_ROOT/bin/idmgr sourced_words )
+
+  echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
+  echo "export IDM_DIR_ROOT='$IDM_DIR_ROOT'"
+  echo "IDM_SRC_WORDS='$IDM_SRC_WORDS'"
+
+  tail -n +2  $IDM_DIR_ROOT/shell/bash.sh
+}
+
+idm_core__comp ()
+{
+  cat $IDM_DIR_ROOT/comp/pass.sh
+  cat $IDM_DIR_ROOT/comp/yadm.sh
+  cat $IDM_DIR_ROOT/comp/ssh.sh
+  cat $IDM_DIR_ROOT/comp/gpg.sh
+  cat $IDM_DIR_ROOT/comp/idmgr.sh
+}
+
+
+## Extended functions
 ##########################################
 
 
-idm_log ()
-{ 
-  set +x
+idm_core__fun ()
+{
+  grep --colour=auto -IRE \
+    '^[a-z0-9_]* \(\)' $IDM_DIR_ROOT/{bin,lib} \
+    | sed "s@$IDM_DIR_ROOT/@@" \
+    | awk -F: '{ print $2 ":" $1 }' \
+    | column -t -s : \
+    | LC_ALL=C sort #    | lib_log DUMP -
 
-  local level=$1
-  shift || true
-  local msg="$@"
+}
 
-  # Take from stdin if no message ...
-  [[ "$msg" = - ]] && msg=$( cat < /dev/stdin )
+idm_core__hier ()
+{
+  idm_core__fun  \
+    | grep __ \
+    | sed -e 's/__/   /' -e 's/()//'
+}
 
-  local color=
-  local reset='\033[0m'
-  case $level in
-    ERR)
-      color='\033[0;31m'
-      ;;
-    WARN|TIP)
-      color='\033[0;33m'
-      ;;
-    NOTICE)
-      color='\033[0;32m'
-      ;;
-    INFO)
-      color='\033[0;37m'
-      ;;
-    DEBUG)
-      color='\033[0;31m'
-      ;;
-    RUN)
-      color='\033[0;34m'
-      ;;
-    CODE)
-      echo "$msg"
-      return
-      ;;
-    DUMP)
-      color='\033[0;36m'
-      echo -e "$color$msg$reset" | sed 's/^/  /'
-      return
-      ;;
-    PREFIX)
-      color='\033[0;34m'
-      ;;
-  esac
+idm_core__sourced_words()
+{
+  local id=${1-}
+  local words=
 
-  if [[ -n "$level" ]]; then
-    printf "$color%6s$reset: %s\n" "$level" "$msg" >&2
+  # When we are asking to output source words
+  words="enable disable kill shell quit q $(idm_get all_id | xargs)"
+
+  echo ":${words// /:}:"
+
+}
+
+
+## Core internal libs
+##########################################
+
+idm_core_exec_mod ()
+{
+  local id=$1
+  local action=$2
+  local sep=$3
+  shift 3
+  local mods=${@-}
+
+  for i in $mods ; do
+    local val="idm_${i}${action}"
+
+    if  [ "$( type -t $val )" = function ]; then
+      #lib_log INFO "Loading module $i ..."
+      [ "$sep" == "_" ] || lib_log NOTICE "$(printf "$sep" $i )"
+      ${val} $id  || \
+        {
+          # DO NOT DISABLE THIS BLOCK, that force plugin to load in anyway
+          true
+          lib_log WARN "Module $i failed in some way ... ($action)"
+        }
+    else
+      echo ""
+      lib_log INFO "Skip module $i"
+    fi
+  done
+}
+
+idm_mod_files ()
+{
+  #p=$IDM_DIR_ROOT/lib ${PATH//:/ }
+  p=$IDM_DIR_LIB
+  find $p -name 'idmgr_mod_*.sh' | xargs
+}
+
+idm_core_mods()
+{
+  local id=${1-}
+  idm_mod_list
+}
+
+
+idm_core_load_lib ()
+{
+  local lib_name=${1}
+  local lib_args=${@-}
+  local env_var=IDM_LIB_${lib_name^^}
+
+  #lib_log DEBUG "$env_var=${!env_var}"
+  [ -z "${!env_var-}" ] ||  return 0
+
+  cmd="$(command -v $lib_name || true )"
+
+  if [ -x "${cmd:-_}" ]; then
+
+    . "$cmd" $lib_args 
+    declare -g $env_var=$cmd
+    lib_log INFO "Loaded lib: $env_var=${!env_var}"
+    #set -x
+
   else
-    echo "Error while log output msg: $message"
+    idm_exit 1 "Could not find 'safe' executable in \$PATH (missing module dependency)"
   fi
 }
 
-#  export PS4='+[${SECONDS}s][${BASH_SOURCE}:${LINENO}]: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'; set -x;
-#  export PS4='.[${SECONDS}s] \[\e[36m\] ${FUNCNAME[0]:+${FUNCNAME[0]}()[${LINENO}]: }\[\e[m\]'; set -x;
-#  export PS4='. $( f="${FUNCNAME[0]:+${FUNCNAME[0]//}}"; printf "%10s:%00d %00d %10s| " ${BASH_SOURCE#$HOME/} ${LINENO} ${SECONDS} "$f")' ; set -x;
-#  export PS4='. $(f="${FUNCNAME[0]:+${FUNCNAME[0]//}}"; s=${BASH_SOURCE#$HOME/}; l=${LINENO}; t=${SECONDS}; printf "%00d %0d %16.50s()  " $l $t "$f")' ; set -x;
-#  export PS4=' \[\e[36m\]> $(f="${FUNCNAME[0]:+${FUNCNAME[0]//}}"; s=${BASH_SOURCE#$HOME/}; l=${LINENO}; t=${SECONDS}; printf "%00d %0d %s():" $l $t "$f")\[\e[m\]\n' ; set -x;
-  #export LOG="idm_log_wrap \$FUNCNAME "
+idm_mod_list ()
+{
+  local mods=
 
+  if [ -z "${@-}" ] ; then
+    mods=$( idm_mod_order $(idm_mod_files) )
+  else
+    mods=$( idm_mod_order ${@} )
+  fi
+
+  echo ":${mods// /:}:"
+}
+
+
+# Takes a list of files to scan for deps
+idm_mod_order ()
+{
+    export IDM_MOD_FILES="$( xargs <<<$@ )"
+
+    # Generate dependency order
+    #result=$(
+      for f in $IDM_MOD_FILES; do
+        mod_name=${f##*mod_}
+        mod_name=${mod_name%\.sh}
+
+        # A bit hackish ...
+        IDM_MOD_DEPS=$( grep '^IDM_MOD_DEPS=' $f )
+        IDM_MOD_DEPS=${IDM_MOD_DEPS##*=}
+        IDM_MOD_DEPS=${IDM_MOD_DEPS//[^a-z0-9 ]}
+        IDM_MOD_DEPS="$( tr ' ' '\n' <<<${IDM_MOD_DEPS} )"
+
+        # Output
+        echo -e "$( xargs -n1 -I{} echo {} "$mod_name" <<<"$IDM_MOD_DEPS" )"
+      done | tsort | grep -v 'core' | xargs
+    #)
+
+    #lib_log DEBUG "Dependencies order: $result"
+    #echo $result
+}
+
+
+## Internal/Debug
 
 idm_exit ()
 {
@@ -180,14 +346,13 @@ idm_exit ()
     msg=${2:-}
   fi
 
-
   if [[ "$rc" -ne 0 ]]; then
-    #idm_trace || true
-    idm_log $lvl "$msg (rc=$rc)"
+    #lib_trace || true
+    lib_log $lvl "$msg (rc=$rc)"
     #[ -z "$dump"  ] || \
-    #  idm_log DUMP "$dump"
+    #  lib_log DUMP "$dump"
   else
-    idm_log $lvl "$msg"
+    lib_log $lvl "$msg"
   fi
 
   # Remove trap
@@ -197,78 +362,112 @@ idm_exit ()
   exit $rc
 }
 
-idm_trace ()
-{
-  local msg=${@}
-  local traces=
-
-  (
-    echo "Stack trace:"
-    for i in {0..10}; do
-      trace=$(caller $i 2>&1 || true )
-      if [ -z "$trace" ] ; then
-        continue
-      else
-        #idm_log DEBUG "Trace $i: $trace"
-        #traces="${traces}${trace}\n"
-        echo "$trace"
-      fi
-    done | tac | column -t 
-    [ -z "$msg" ] || echo "Trace ctx: $msg"
-  ) |  >&2  idm_log DUMP -
-}
 
 idm_exit_trap () {
     set +x
     rc=$?
     if [[ $rc -ne 0 ]]; then
-      idm_log ERR "The script exited with exit code: $rc"
-      idm_trace || true
+      lib_log ERR "The script exited with exit code: $rc"
+      lib_trace || true
     #else
-    #  idm_log WARN  "The script exit has been trapped !"
-    #  idm_trace || true
+    #  lib_log WARN  "The script exit has been trapped !"
+    #  lib_trace || true
     fi
     exit $rc
 }
 
 
-idm_require_bin () {
-  local bin=$1
-  shift 1 || true
-  local opts=${@-}
+## Data, tests
 
-  if command -v "$bin" &> /dev/null; then
-    declare -g ${bin^^}="$bin $opts"
-    return 0
-  else
-    idm_log ERR "Missing '$bin'"
-    return 1
-  fi
-}
-
-
-idm__load_lib ()
+# Should be replaced by idm_validate ?
+# Is a wrapper for enduser !!!
+idm_is_enabled ()
 {
-  local lib_name=${1}
-  local lib_args=${@-}
-  local env_var=IDM_LIB_${lib_name^^}
-
-  #idm_log DEBUG "$env_var=${!env_var}"
-  [ -z "${!env_var-}" ] ||  return 0
-
-  cmd="$(command -v $lib_name || true )"
-
-  if [ -x "${cmd:-_}" ]; then
-
-    . "$cmd" $lib_args 
-    declare -g $env_var=$cmd
-    idm_log INFO "Loaded lib: $env_var=${!env_var}"
-    #set -x
-
-  else
-    idm_exit 1 "Could not find 'safe' executable in \$PATH (missing module dependency)"
-  fi
+  local id=${1}
+  idm_validate is_enabled $id 
+  {
+    lib_log WARN "You need to activate an id first"
+    return 1
+  }
 }
+
+idm_get ()
+{
+  local item=$1
+  local value=${2-}
+
+  case $item in
+    all_id)
+      for id in $( find $IDM_DIR_ID -type f -name '*.env' 2>/dev/null ); do
+        id=${id%%\.env}
+        echo "${id##*/}"
+      done 
+    ;;
+
+    all_id_files)
+      ls $IDM_DIR_ID/*.env || true
+    ;;
+
+    id_config)
+      if [ -f "$IDM_DIR_ID/$value.env" ]; then
+        echo "id=$value"
+        cat $IDM_DIR_ID/$value.env
+      else
+        return 1
+      fi
+    ;;
+
+    *)
+      lib_log ERR "Cannot get item '$item'"
+    ;;
+  esac
+}
+
+idm_validate ()
+{
+  local type=$1
+  local value=${2-}
+
+  case $type in
+    id_filter|id)
+      [ "$value" != '_' ] && \
+        [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return $?
+    ;;
+    id_config)
+      if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
+        return 0
+      fi
+    ;;
+    is_enabled)
+      if [[ -z "${value-}" && "${value-}" != '_' ]]; then
+        if [ -z "${SHELL_ID-}" ] ; then
+          return 1
+        else
+          return 0
+        fi
+      else
+        if [ "${value-}" == "${SHELL_ID-}" ]; then
+          return 0
+        else
+          return 1
+        fi
+      fi
+    ;;
+    is_disabled)
+      [ -z "${SHELL_ID-}" ] && return $?
+    ;;
+      
+    *)
+      lib_log ERR "Cannot validate type '$type'"
+    ;;
+  esac
+
+  return 1
+}
+
+
+## User interface
+##########################################
 
 # This function display a user skippable timeout.
 idm_cli_timeout ()
@@ -282,10 +481,10 @@ idm_cli_timeout ()
   [ "$default_rc" -ge 0 ] || default_rc=1
   if [ "$default_rc" -eq 0 ]; then
     human_word="abort"
-    go_word=QUIT
+    go_word=Q
   elif [ "$default_rc" -ne 0 ]; then
     human_word="continue"
-    go_word=GO
+    go_word=Y
   fi
 
   # Notifying user
@@ -317,368 +516,11 @@ idm_cli_timeout ()
 
   # We loop back
   idm_cli_timeout $default_rc $remaining 
-
-}
-
-
-idm_get ()
-{
-  local item=$1
-  local value=${2-}
-
-  case $item in
-    all_id)
-      for id in $IDM_DIR_ID/*.env; do
-        id=${id%%\.env}
-        echo "${id##*/}"
-      done 
-    ;;
-
-    all_id_files)
-      ls $IDM_DIR_ID/*.env || true
-    ;;
-
-    id_config)
-      if [ -f "$IDM_DIR_ID/$value.env" ]; then
-        echo "id=$value"
-        cat $IDM_DIR_ID/$value.env
-      else
-        return 1
-      fi
-    ;;
-
-    *)
-      idm_log ERR "Cannot get item '$item'"
-    ;;
-  esac
-}
-
-idm_validate ()
-{
-  local type=$1
-  local value=${2-}
-
-  case $type in
-    id)
-      [ "$value" != '_' ] && \
-        [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return $?
-    ;;
-    id_config)
-      if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
-        return 0
-      fi
-    ;;
-    is_enabled)
-      [ ! -z "${SHELL_ID}" ] && return $?
-    ;;
-    is_disabled)
-      [ -z "${SHELL_ID}" ] && return $?
-    ;;
-      
-    *)
-      idm_log ERR "Cannot validate type '$type'"
-    ;;
-  esac
-
-  return 1
-}
-
-# Should be replaced by idm_validate ?
-idm_is_enabled ()
-{
-  local id=${1}
-  idm_validate id $id || \
-    idm_exit 1 ERR "You need to activate an id first"
-
-}
-
-
-idm_reverse_doted_list ()
-{
-  local list=$1
-  awk 'BEGIN{FS=OFS=":"} {s=$NF; for (i=NF-1; i>=1; i--) s = s OFS $i; print s}' <<<"$list"
-}
-
-
-idm_parse_filerules ()
-{
-  local id=$1
-  local f=$2
-  #set -x
-
-  local YADM_ENCRYPT="$2"
-
-  ENCRYPT_INCLUDE_FILES=()
-  ENCRYPT_EXCLUDE_FILES=()
-
-  #cd_work "Parsing encrypt" || return
-  cd ~
-
-  exclude_pattern="^!(.+)"
-  if [ -f "$YADM_ENCRYPT" ] ; then
-    #; parse both included/excluded
-    while IFS='' read -r line || [ -n "$line" ]; do
-      if [[ ! $line =~ ^# && ! $line =~ ^[[:space:]]*$ ]] ; then
-        local IFS=$'\n'
-        for pattern in $line; do
-          if [[ "$pattern" =~ $exclude_pattern ]]; then
-            for ex_file in ${BASH_REMATCH[1]}; do
-              for f in $( find $ex_file -type f ); do
-              #if [ -e "$ex_file" ]; then
-                ENCRYPT_EXCLUDE_FILES+=("$f")
-              #fi
-              done
-            done
-          else
-            for in_file in $pattern; do
-              for f in $( find $in_file -type f ); do
-              #if [ -e "$in_file" ]; then
-                ENCRYPT_INCLUDE_FILES+=("$f")
-              #fi
-              done
-            done
-          fi
-        done
-      fi
-    done < "$YADM_ENCRYPT"
-
-    #; remove excludes from the includes
-    #(SC2068 is disabled because in this case, we desire globbing)
-    FINAL_INCLUDE=()
-    #shellcheck disable=SC2068
-    for included in "${ENCRYPT_INCLUDE_FILES[@]}"; do
-      skip=
-      #shellcheck disable=SC2068
-      for ex_file in ${ENCRYPT_EXCLUDE_FILES[@]}; do
-        [ "$included" == "$ex_file" ] && { skip=1; break; }
-      done
-      [ -n "$skip" ] || FINAL_INCLUDE+=("$included")
-    done
-    ENCRYPT_INCLUDE_FILES=("${FINAL_INCLUDE[@]}")
-
-    echo "${ENCRYPT_INCLUDE_FILES[@]}"
-  fi
-
-}
-
-## IDM Internal
-##########################################
-
-
-# Takes a list of files to scan for deps
-idm_mod__order ()
-{
-    export IDM_MOD_FILES="$( xargs <<<$@ )"
-
-    # Generate dependency order
-    #result=$(
-      for f in $IDM_MOD_FILES; do
-        mod_name=${f##*mod_}
-        mod_name=${mod_name%\.sh}
-
-        # A bit hackish ...
-        IDM_MOD_DEPS=$( grep '^IDM_MOD_DEPS=' $f )
-        IDM_MOD_DEPS=${IDM_MOD_DEPS##*=}
-        IDM_MOD_DEPS=${IDM_MOD_DEPS//[^a-z0-9 ]}
-        IDM_MOD_DEPS="$( tr ' ' '\n' <<<${IDM_MOD_DEPS} )"
-
-        # Output
-        echo -e "$( xargs -n1 -I{} echo {} "$mod_name" <<<"$IDM_MOD_DEPS" )"
-      done | tsort | grep -v 'core' | xargs
-    #)
-
-    #idm_log DEBUG "Dependencies order: $result"
-    #echo $result
-
-}
-
-idm_mod_files ()
-{
-  #p=$IDM_DIR_ROOT/lib ${PATH//:/ }
-  p=$IDM_DIR_LIB
-  find $p -name 'idmgr_mod_*.sh' | xargs
-}
-
-idm_mod_list ()
-{
-  local mods=
-
-  if [ -z "${@-}" ] ; then
-    mods=$( idm_mod__order $(idm_mod_files) )
-  else
-    mods=$( idm_mod__order ${@} )
-  fi
-
-  echo ":${mods// /:}:"
-}
-
-
-## Required functions
-##########################################
-idm_core_ls ()
-{
-  local id=${1}
-
-  for i in ${IDM_MOD_ORDER//:/ } ; do
-    local val="idm_${i}_ls"
-    idm_log NOTICE "List $i"
-
-    ${val} $id || \
-      {
-        true
-        idm_log INFO "No listing function for $i"
-      }
-    echo ""
-  done
-}
-
-
-idm_core_enable ()
-{
-  local id=${1:-${SHELL_ID-}}
-  local conf
-
-  # Local checks
-  idm_validate id $id || idm_exit 1 ERR "You must provide an id"
-  idm_validate id_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
-
-  # Check if workspace is enabled
-  if [ "${SHELL_ID-}" == "$id" ]; then
-    idm_exit 0 INFO "Your workspace is already activated"
-  elif [ -n "${SHELL_ID-}" ]; then
-    idm_exit 0 WARN "Your workspace is already activated with $SHELL_ID"
-  fi
-
-  # Retrieve environment config
-  conf="$IDM_DIR_ID/$id.env"
-
-  # Notice user
-  {
-    . $conf
-
-    for i in ${IDM_MOD_ORDER//:/ } ; do
-      local val="idm_${i}_enable"
-      idm_log INFO "Loading $i ..."
-
-      ${val} $id  || \
-        {
-          true
-          idm_log INFO "No enable function for $i"
-        }
-      echo ""
-    done
-
-  } | idm_log CODE -
-
-  idm_log NOTICE "Identity '$id' is loaded"
-
-}
-
-idm_core_disable ()
-{
-  local id=${1}
-  idm_is_enabled $id
-
-  # Reverse module unloading
-  IDM_MOD_ORDER="$( idm_reverse_doted_list $IDM_MOD_ORDER )" 
-
-  # Loop over disable functions
-  (
-    for i in ${IDM_MOD_ORDER//:/ } ; do
-      local val="idm_${i}_disable"
-      #idm_log INFO "Disable $i ..."
-
-      ${val} $id 2>/dev/null || \
-        {
-          true
-          idm_log INFO "No disable function for $i"
-        }
-      echo ""
-    done
-  ) | idm_log CODE -
-
-  # Inform user
-  idm_log NOTICE "Id $id is disabled"
-}
-
-idm_core_kill ()
-{
-  local id=${1}
-  idm_is_enabled $id
-
-  # Reverse module killing
-  IDM_MOD_ORDER="$( idm_reverse_doted_list $IDM_MOD_ORDER )" 
-
-  # Kill all modules
-  (
-    for i in ${IDM_MOD_ORDER//:/ } ; do
-      local val="idm_${i}_kill"
-      #idm_log INFO "Disable $i ..."
-
-      ${val} $id 2>/dev/null || \
-        {
-          true
-          idm_log INFO "No kill function for $i"
-        }
-      echo ""
-    done
-  ) | idm_log CODE -
-
-  # Inform user
-  idm_log NOTICE "Id $id is safely killed"
-
-}
-
-
-## Extended functions
-##########################################
-
-idm_core_mods()
-{
-  local id=${1-}
-  idm_mod_list
-}
-
-idm_core_sourced_words()
-{
-  local id=${1-}
-  local words=
-
-  # When we are asking to output source words
-  words="enable disable kill shell quit q $(idm_get all_id | xargs)"
-
-  echo ":${words// /:}:"
-
-}
-
-idm_core_shell ()
-{
-  IDM_SRC_WORDS=$( $IDM_DIR_ROOT/bin/idmgr sourced_words )
-
-  echo "IDM_DIR_ROOT='$IDM_DIR_ROOT'"
-  echo "IDM_SRC_WORDS='$IDM_SRC_WORDS'"
-  echo "IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
-
-  tail -n +2  $IDM_DIR_ROOT/shell/bash.sh
-}
-
-idm_core_completion ()
-{
-  cat $IDM_DIR_ROOT/comp/pass.sh
-  cat $IDM_DIR_ROOT/comp/yadm.sh
-  cat $IDM_DIR_ROOT/comp/ssh.sh
-  cat $IDM_DIR_ROOT/comp/gpg.sh
-  cat $IDM_DIR_ROOT/comp/idmgr.sh
 }
 
 
 ## Entry points
 ##########################################
-
-
-
-trap "idm_exit_trap" INT TERM EXIT
-
 
 idm_menu_main () 
 {
@@ -688,9 +530,20 @@ idm_menu_main ()
   local action=
   local id=
   local opt=
-  local shell_id=${SHELL_ID-:_}
+  local shell_id=${SHELL_ID:-_}
+
+  # Load external libs
+  #for lib in $( find $IDM_DIR_LIB -name 'idm_lib_*.sh'); do
+  while read -r lib; do
+    #. $lib || lib_log WARN "Error while loading lib $lib :/"
+    . ${lib:-/dev/null} || echo  "  WARN: Error while loading lib: ${lib:-NONE}"
+  done <<< "$( find $IDM_DIR_LIB -name 'idm_lib_*.sh')"
+
+
+  trap "idm_exit_trap" INT TERM EXIT
 
   idm_init
+  #set -x
 
   # Three way parsing
   if [ "$#" -eq 0 ]; then
@@ -761,8 +614,13 @@ idm_menu_main ()
   esac
 
   # Dispatch
-  #idm_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
-  if  [ "$( type -t idm_${menu}_${action:-_} )" = function ]; then
+  #lib_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
+  #set -x
+  if  [ "$( type -t idm_${menu}__${action:-_} )" = function ]; then
+    idm_${menu}__${action:-_} $id $opt
+    return $?
+  elif  [ "$( type -t idm_${menu}_${action:-_} )" = function ]; then
+    lib_log WARN "Debug mode enabled"
     idm_${menu}_${action:-_} $id $opt
     return $?
   elif  [ "$( type -t idm_${menu} )" = function ]; then
@@ -771,17 +629,24 @@ idm_menu_main ()
   fi
 
   idm_exit 1 "Command not matched: menu=$menu action=$action id=$id opt=$opt"
-
-
 }
-
 
 
 ## Main
 ##########################################
 
-
 idm_menu_main $@
+
+
+
+
+
+
+
+
+
+
+
 
 
 
