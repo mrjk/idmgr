@@ -168,6 +168,7 @@ idm_vars_git_local () {
   git_local_work_tree=$HOME
   git_local_dir=$IDM_DIR_CACHE/git/$id/local.git
   git_local_config=${IDM_CONFIG_DIR}/git/$id/local_gitconfig
+
   git_local="lib_git_bin $git_local_dir $git_local_work_tree"
   GIT_LOCAL=$git_local
 }

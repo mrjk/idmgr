@@ -258,12 +258,10 @@ idm_tomb__encrypt ()
   idm_tomb__sync $id ||
     idm_exit 1 ERR "Failed to push commits to tomb repo"
 
-  #set -x
   # Encrypt tomb data
   lib_gpg_encrypt_dir $git_tomb_dir $git_tomb_enc _PASS || \
     idm_exit 1 ERR "Failed to create tomb"
 
-  #set -x
   ## Encrypt local data
   lib_gpg_encrypt_dir $git_local_dir $git_local_enc $GIT_AUTHOR_EMAIL || \
     idm_exit 1 ERR "Could not create local repo data"
@@ -282,11 +280,8 @@ idm_tomb__decrypt ()
 
   # Sanity check
   idm_tomb_require_enabled $id
-  #idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue"
-
 
   # Check if tomb repo is absent
-  ##_load_tomb_env
   if lib_git_is_repo $git_tomb_dir $git_local_work_tree ; then
     lib_log WARN "A local repo is already present, we will overwrite it. Do you want to continue?"
     idm_cli_timeout 0 || idm_exit 1 ERR "Refuse to override existing repo"
@@ -428,122 +423,3 @@ idm_tomb_require_valid_local_repo ()
     idm_exit 1 NOTICE "You need to commit all your changes"
   fi
 }
-
-# Moved to mod_gpg
-#        ## GPG functions
-#        ##############################
-#        
-#        
-#        lib_gpg_decrypt_dir ()
-#        {
-#          local src=$1
-#          local dst=${2-}
-#          local key=${3-}
-#          local gpg_opts=""
-#          local tar_opts=
-#        
-#          # Check required bin
-#          lib_require_bin tar || idm_exit 1
-#          lib_require_bin gpg2 || idm_exit 1
-#          export GPG=${GPG2:-$GPG}
-#        
-#          tar_opts=" -C ${dst%/*} -zx "
-#          if [ ! -z "$key" ]; then
-#            gpg_opts+="--batch -d"
-#          else
-#            gpg_opts+="-d"
-#          fi
-#        
-#          $GPG $gpg_opts $src | $TAR $tar_opts || \
-#            idm_exit 1 ERR "Could not decrypt file: $src into $dst"
-#        
-#        }
-#        
-#        
-#        lib_gpg_encrypt_dir ()
-#        {
-#          local src=$1
-#          local dst=$2
-#          local key=${3-}
-#          local pass=
-#          local recipients=
-#        
-#          # Check required bin
-#          lib_require_bin tar || idm_exit 1
-#          lib_require_bin gpg2 || idm_exit 1
-#          export GPG=${GPG2:-$GPG}
-#        
-#          #GPG_KEY="$(yadm config yadm.gpg-recipient || true )"
-#          #GPG_KEY="${GPG_DEFAULT_ID-}"
-#        
-#          # Check pgp key and arguments
-#          if lib_gpg_is_valid_key $key; then
-#        
-#            shift 3
-#            local ok=0 ko=0
-#            recipients=${@:-${GPG_DEFAULT_ID-}}
-#            gpg_opts="-e -r $recipients"
-#        
-#            # Determine if we are looking for key or password
-#            for r in $recipients; do
-#              lib_gpg_is_valid_recipients $r &>/dev/null \
-#                && ok=$(( $ok + 1 ))\
-#                || ko=$(( $ko + 1 ))
-#        
-#              if [[ "$ok" -ne 0 && "$ko" -ne 0 ]]; then
-#                idm_exit 1 ERR "One of the recipients is not known: $r in '$recipients'"
-#              fi
-#            done
-#        
-#            # Act according our pattern
-#            if [[ "$ok" -eq 0 && "$ko" -ne 0 ]]; then
-#              pass="$@"
-#              recipients=
-#              gpg_opts="-c"
-#              lib_log NOTICE "Secret will be encrypted with pass '$pass'"
-#            else
-#              lib_log NOTICE "Secret will be encrypted with key '$key' ${recipients:+ to '$recipients'}"
-#            fi
-#        
-#          else
-#            if [ "$key" == "_ASK" ]; then
-#              pass=_ASK
-#              key=
-#              gpg_opts="--no-default-recipient -e"
-#              lib_log NOTICE "User will be prompted for known recipients"
-#            elif [ -z "$key" -o "$key" == "_PASS" ]; then
-#              pass=
-#              key=
-#              gpg_opts="-c"
-#              lib_log NOTICE "User will be prompted for password (symetric)"
-#            else
-#              # Not available yet, see stdin for password input
-#              # To fix: passwords in clear :/ use stdout3
-#              pass="$key"
-#              key=
-#              gpg_opts="-c --passphrase $pass --batch "
-#              lib_log NOTICE "Secret will be encrypted with pass '***' (symetric)"
-#            fi
-#          fi
-#        
-#          # Encrypt all the stuffs
-#          $TAR -C "${src%/*}" -cz "${src##*/}" 2>/dev/null | \
-#            $GPG -a $gpg_opts --yes -o $dst || \
-#              idm_exit 1 ERR "Could not encrypt directory: $src"
-#        
-#          # File descritor tests ...
-#          #exec 3<> /tmp/foo
-#          #>&3 echo "$pass"
-#          #{ echo "$pass\n" >&3 ; $TAR -C "$(dirname $src)" -cz "$src" 2>/dev/null; } | \
-#          #exec 3>&- #close fd 3.
-#        
-#        }
-#        
-#        
-#        
-#        
-#        
-#        
-#        
-
-

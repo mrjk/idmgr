@@ -345,6 +345,8 @@ lib_gpg_encrypt_dir ()
     $GPG -a $gpg_opts --yes -o $dst || \
       idm_exit 1 ERR "Could not encrypt directory: $src"
 
+  #set +x
+
   # File descritor tests ...
   #exec 3<> /tmp/foo
   #>&3 echo "$pass"
