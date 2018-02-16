@@ -57,6 +57,14 @@ idm_tomb__ls ()
   local d_m=
   local date_today=$(date '+%s')
 
+
+  echo "  Tombs:"
+  find $IDM_CONFIG_DIR/enc/ -type f -name '*.tomb' -printf "%f             (%Tc)\n" |
+    sed -e 's/^/    /'
+
+  idm_tomb_require_enabled $id || return 0
+
+  # Calculate data
   if [ -d "$git_tomb_dir" ]; then
     g_st=open
     g_m=$( lib_date_diff_human $(find $git_tomb_dir -maxdepth 0 -printf "%Ts") )
@@ -326,8 +334,6 @@ idm_tomb__init()
   if lib_git_has_commits $git_local_dir $git_local_work_tree ; then
     idm_tomb__sync $id
   fi
-  
-  lib_log NOTICE "Tomb repository has been created"
 
 }
 
