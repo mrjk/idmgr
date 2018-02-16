@@ -390,7 +390,7 @@ idm_tomb_require_enabled ()
   
   # Load local repo vars
   idm_vars_git_local
-  git_local_enc=$IDM_CONFIG_DIR/enc/$id.tomb
+  git_local_enc=$IDM_DIR_CACHE/git/$id/local.git.tar.gz.asc
 
   # Load tomb vars
   idm_vars_git_tomb
