@@ -152,7 +152,7 @@ idm_tomb__push ()
 {
   local id=$1
   local arg=${2-}
-  idm_tomb__init $id
+  idm_tomb_require_enabled $id
 
   # Manage argument
   if grep -sq "$arg" $IDM_CONFIG_DIR/git/$id/known_hosts ; then
@@ -245,9 +245,8 @@ idm_tomb__encrypt ()
   local id=$1
 
   # Sanity check: id and local repo
-  idm_tomb__init $id
-  #idm_tomb_require_enabled $id
-  #idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue"
+  idm_tomb_require_enabled $id
+  idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue"
 
   # We check tomb repo here
   lib_git_is_repo $git_tomb_dir $git_tomb_work_tree || \
@@ -302,6 +301,9 @@ idm_tomb__decrypt ()
     lib_gpg_decrypt_dir $git_tomb_enc $git_tomb_dir || \
      idm_exit 1 ERR "Could not extract tomb"
   fi
+
+  # Sync :D
+  #idm_tomb__sync $id
 
   lib_log NOTICE "Your tomb has been decrypted"
 
