@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IDM_MOD_DEPS="id"
-
+IDM_DISABLE_AUTO+=" git__enable git__disable git__kill "
 
 
 

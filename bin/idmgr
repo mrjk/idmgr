@@ -35,6 +35,8 @@ IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
+# Mod vars ...
+IDM_DISABLE_AUTO=
 
 # Main initialisation settings
 idm_init ()
@@ -233,8 +235,15 @@ idm_core_exec_mod ()
     local val="idm_${i}${action}"
 
     if  [ "$( type -t $val )" = function ]; then
+
+      #set -x
+      # Skip if disabled ...
+      [[ ":${IDM_DISABLE_AUTO// /:}" =~ :${i}${action}: ]] && continue
+      #set +x
+
       #lib_log INFO "Loading module $i ..."
       [ "$sep" == "_" ] || lib_log NOTICE "$(printf "$sep" $i )"
+      export IDM_MOD_EXEC=chain
       ${val} $id  || \
         {
           # DO NOT DISABLE THIS BLOCK, that force plugin to load in anyway

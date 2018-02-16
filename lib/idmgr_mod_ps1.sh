@@ -1,6 +1,7 @@
 #!/bin/bash
 
 IDM_MOD_DEPS="id pass gpg ssh"
+IDM_DISABLE_AUTO+="ps1__ls"
 
 ## Prompt functions
 ##########################################
