@@ -9,30 +9,42 @@ IDM_DISABLE_AUTO+=" tomb__enable tomb__disable tomb__kill "
 
 
 
-## Tomb functions
+## Environments
 ##########################################
 
-# Install yadm
-# git clone https://github.com/TheLocehiliosan/yadm.git ~/.usr/opt/yadm
-# 
-# This allow to secure your things ....
+idm_tomb_header ()
+{
+  local id=$1
 
+  # Check if id is valid
+  lib_id_has_config $id
+
+  # Load local repo vars
+  idm_git_header $id
+  git_id_enc=$IDM_DIR_CACHE/git/$id/local.git.tar.gz.asc
+
+  # Load tomb vars
+  idm_vars_git_tomb $id
+  git_tomb_config=${IDM_CONFIG_DIR}/git/$id/local_gitconfig
+  git_tomb_dir=$git_dir
+  git_tomb_work_tree=$git_work_tree
+  git_tomb_enc=$IDM_CONFIG_DIR/enc/$id.tomb
+  git_id_tomb_repo_name=tomb
+}
 
 idm_vars_git_tomb () {
-  git_tomb_work_tree=$HOME
-  git_tomb_dir=$IDM_DIR_CACHE/git/$id/tomb.git
-  git_tomb_config=${IDM_CONFIG_DIR}/git/$id/tomb_gitconfig
-  git_tomb_enc=$IDM_CONFIG_DIR/enc/$id.tomb
+  local id=$1
+  git_dir=$IDM_DIR_CACHE/git/$id/tomb.git
+  git_work_tree=$git_dir/.git
 }
+
 
 ## Front functions
 ##############################
 
-
 idm_tomb__help ()
 {
   local id=$1
-  idm_vars_git_tomb
 
   echo "tomb"
   echo "  workflow:"
@@ -43,116 +55,278 @@ idm_tomb__help ()
   printf "    %-20s: %s\n" "tomb encrypt" "Save the current configuration into the tomb"
   printf "    %-20s: %s\n" "tomb push <remote>|all" "Save the current configuration into the tomb"
   printf "    %-20s: %s\n" "tomb leave" "Remove all traces of your passage"
-  echo "  config:"
-  printf "    %-20s: %s\n" "git_tomb_enc" "$git_tomb_enc"
-  printf "    %-20s: %s\n" "git_tomb_dir" "$git_tomb_dir"
-  printf "    %-20s: %s\n" "git_tomb_config" "$git_tomb_config"
-  return 0
+
+  if lib_id_is_enabled $id; then
+    idm_tomb_header $id
+    echo "  config:"
+    printf "    %-20s: %s\n" "git_tomb_enc" "$git_tomb_enc"
+    printf "    %-20s: %s\n" "git_tomb_dir" "$git_tomb_dir"
+    printf "    %-20s: %s\n" "git_tomb_config" "$git_tomb_config"
+  fi
+
 }
 
 idm_tomb__ls ()
 {
   local id=$1
-  idm_vars_git_tomb
-  local g_st=
-  local t_st=
-  local d_c=
-  local d_m=
-  local date_today=$(date '+%s')
-
 
   echo "  Tombs:"
-  find $IDM_CONFIG_DIR/enc/ -type f -name '*.tomb' -printf "%f             (%Tc)\n" |
-    sed -e 's/^/    /'
-
-  idm_tomb_require_enabled $id || return 0
-
-  # Calculate data
-  if [ -d "$git_tomb_dir" ]; then
-    g_st=open
-    g_m=$( lib_date_diff_human $(find $git_tomb_dir -maxdepth 0 -printf "%Ts") )
-    g_m=" $d_m"
-  else
-    g_st=closed
-    g_m=
-  fi
-
-  if [ -f "$git_tomb_enc" ]; then
-    t_st=present 
-    t_m=$( lib_date_diff_human $(find $git_tomb_enc -printf "%Ts") )
-    t_m=", $t_m old"
-
-  else
-    t_st=absent
-    t_m=
-  fi
-
-  echo "  Info:"
-  printf "    %-20s: %s\n" "encrypted tomb" "$t_st${t_m}"
-  printf "    %-20s: %s\n" "encrypted file" "$git_tomb_enc"
-  printf "    %-20s: %s\n" "tomb git status" "$g_st$g_m"
-  printf "    %-20s: %s\n" "tomb git dir" "$git_tomb_dir"
-
-  if lib_git_is_repo $git_tomb_dir $git_tomb_work_tree; then
-    echo "  Git remotes:"
-    _git_tomb remote -v | sed 's/^/    /'
-  fi
-}
-
-# This leave everything open at this stage !!!
-idm_tomb__sync ()
-{
-  local id=$1
-  local repo_name=${2:-tomb}
+  find $IDM_CONFIG_DIR/enc/ -type f -name "*.tomb" | sed "s@$HOME@    ~@"
 
 
-  # Sanity check: id and local repo
-  idm_tomb_require_enabled $id
-  idm_tomb_require_valid_local_repo
+  if lib_id_is_enabled $id; then
+    local tomb_status=
+    local tomb_date=
+    local git_status=
+    local git_date=
 
-  # Tomb repo check
-  #set -x
+    # Load local vars
+    idm_tomb_header $id
 
-  if ! lib_git_is_repo $git_tomb_dir $git_tomb_work_tree; then
+    # Get status of tomb file
     if [ -f "$git_tomb_enc" ]; then
-
-      lib_log WARN "An encrypted tomb has been found. Do you want to decrypt it?"
-      idm_cli_timeout 1 || idm_exit 1 ERR "Refuse to create a tomb duplicate"
-      idm_tomb__decrypt $id || idm_exit 1 ERR "Failed to create tomb repo"
-
-    elif [ ! -d "$git_tomb_dir" ]; then
-      idm_tomb__init $id || idm_exit 1 ERR "Tomb cannot be used without git"
-      lib_log NOTICE "A tomb has been created"
-      return 0
+      tomb_status=open
+      tomb_date=$( lib_date_diff_human $(find $git_tomb_enc -printf "%Ts") )
+      tomb_date=", $tomb_date old"
     else
-      idm_exit 1 ERR "Unknow error"
+      tomb_status=closed
+    fi
+
+    # Get status of git repo
+    if [ -d "$git_tomb_dir" ]; then
+      git_status=present
+      #git_date=$( lib_date_diff_human $(find $git_tomb_dir -maxdepth 0 -printf "%Ts") )
+      #git_date=" $git_date"
+    else
+      git_status=absent
+    fi
+
+    # Display
+    echo "  Status:"
+    printf "    %-20s: %s\n" "encrypted tomb" "$tomb_status${tomb_date}"
+    printf "    %-20s: %s\n" "encrypted file" "$git_tomb_enc"
+    printf "    %-20s: %s\n" "tomb git status" "$git_status${git_date}"
+    printf "    %-20s: %s\n" "tomb git dir" "$git_tomb_dir"
+
+    # Show git remotes
+    if lib_git_is_repo id; then
+      echo "  Git remotes:"
+      lib_git id remote -v | sed 's/^/    /'
+      echo "  Last commits:"
+      lib_git id l --color=always | sed 's/^/    /'
+      echo
     fi
   fi
 
-  # Work on local
-  _git_tomb remote show $repo_name &>/dev/null ||
-    _git_tomb remote add $repo_name $git_tomb_dir ||
-      idm_exit 1 ERR "Failed to add tomb remote to local git"
 
-  {
-    _git_tomb fetch --all --tags && 
-      _git_tomb push -u $repo_name --all &&
-        _git_tomb push -u $repo_name --tags 
-  } >/dev/null  || idm_exit 1 ERR "Something where wrong while syncinc"
-   
-  lib_log NOTICE "Tomb and local repository are now synced"
-
-  # Restore ctx
 }
 
 
+idm_tomb__rm ()
+{
+  local id=$1
+  local report=
+
+  # Load tomb variables
+  idm_tomb_header $id
+
+  # Delete local remote branch
+  if lib_git id remote show $git_id_tomb_repo_name &>/dev/null ; then
+    lib_git id remote rm $git_id_tomb_repo_name || 
+      {
+        lib_log INFO "Could not remote tomb remote"
+        return 1
+      }
+  else
+    lib_log INFO "Tomb remote is already absent"
+  fi
+
+  # Delete git repo
+  if [ -d "$git_tomb_dir" ] ; then
+    rm -rf "$git_tomb_dir"
+  else
+    lib_log INFO "Tomb repository is already absent"
+  fi
+
+  # Notify
+  lib_log NOTICE "Tomb repository has been deleted"
+}
+
+idm_tomb__init ()
+{
+  local id=$1
+
+  # Check if local repo is not empty
+  lib_git_is_repo_with_commits id || 
+    {
+      lib_log INFO "Local repository must be present first"
+      return 0
+    }
+
+  # Load tomb variables
+  idm_tomb_header $id
+
+  # Check if local repo already exists # TOFIX !!! use lib_git_is_repo instead
+  if [ -d "$git_tomb_dir" ] ; then
+    lib_log INFO "Tomb repository alreay exists"
+    return 0
+  fi
+
+  # Create tomb: from local files
+  if [ -f "$git_tomb_enc" ]; then
+
+    lib_log WARN "An encrypted tomb has been found. Do you want to decrypt it? ($git_tomb_enc)"
+    if idm_cli_timeout 1 || false ; then
+      lib_log "Extracting existing tomb ..."
+      idm_tomb__decrypt $id || 
+        idm_exit 1 ERR "Failed to create tomb repo"
+    else
+      lib_log INFO "Skipping existing tomb, creating a fresh one ..."
+    fi
+
+  fi
+
+  # Create tomb: from other file #TODO
+  # Create tomb: from other host #TODO
+
+  # Create tomb: from scratch
+  if [ -f "$git_tomb_enc" ]; then
+    mkdir -p "$git_tomb_dir"
+    _git_tomb clone --bare $git_id_dir $git_tomb_dir || \
+      idm_exit 1 ERR "Could not create tomb repo"
+    lib_log NOTICE "Tomb repository has been created"
+  fi
+
+  # Add tomb remote to local repo
+  lib_git id remote | grep -q $git_id_tomb_repo_name ||
+    lib_git id remote add $git_id_tomb_repo_name $git_tomb_dir ||
+      idm_exit 1 ERR "Failed to add tomb remote to local git"
+
+  # Syncrhonise with tomb
+  #if lib_git_is_repo_with_commits id ; then
+  #  idm_tomb__sync $id
+  #fi
+
+}
+
+
+idm_tomb__sync ()
+{
+  local id=$1
+
+  # Sanity check: id and local repo
+  idm_tomb_header $id
+  lib_git_is_repo_with_commits id
+
+  # Tomb repo check
+  lib_git_is_repo tomb ||
+    idm_tomb__init $id ||
+      {
+        lib_log ERR "Failed to create tomb repo"
+        return 1
+      }
+
+  # Work on local
+  {
+    lib_git id fetch --all --tags && 
+      lib_git id push -u $git_id_tomb_repo_name --all &&
+        lib_git id push -u $git_id_tomb_repo_name --tags 
+  } >/dev/null  || idm_exit 1 ERR "Something where wrong while syncinc"
+   
+  # Notify user
+  lib_log NOTICE "Tomb and local repository are now synced"
+}
+
+
+#### THIS PART BELOW NEED REFACTOOOORRRR
+
+idm_tomb__encrypt ()
+{
+  local id=$1
+
+  #set -x
+  idm_tomb_header $id
+  lib_git_is_all_commited id
+
+  # We check tomb repo here
+  lib_git_is_repo tomb ||
+    idm_tomb__init $id ||
+      {
+        lib_log ERR "Failed to create tomb repo"
+        return 1
+      }
+
+  # Full sync both repo
+  idm_tomb__sync $id ||
+    idm_exit 1 ERR "Failed to push commits to tomb repo"
+
+  # Encrypt tomb data
+  lib_gpg_encrypt_dir $git_tomb_dir $git_tomb_enc _PASS || \
+    idm_exit 1 ERR "Failed to create tomb"
+
+  ## Encrypt local data
+  lib_gpg_encrypt_dir $git_id_dir $git_id_enc $GIT_AUTHOR_EMAIL || \
+    idm_exit 1 ERR "Could not create local repo data"
+
+  # Clean tomb
+  rm -rf $git_tomb_dir
+
+  lib_log NOTICE "Tomb has been closed into: $git_tomb_enc"
+}
+
+idm_tomb__decrypt ()
+{
+  local id=$1
+  shift || true
+  local opt=${@-}
+
+  # Sanity check
+  idm_tomb_require_enabled $id
+
+  # Check if tomb repo is absent
+  if lib_git_is_repo $git_tomb_dir $git_id_work_tree ; then
+    lib_log WARN "A local repo is already present, we will overwrite it. Do you want to continue?"
+    idm_cli_timeout 0 || idm_exit 1 ERR "Refuse to override existing repo"
+
+    # Let's not delete existing repo, just for fun and wee how git react :p
+  fi
+
+  # Extract tomb
+  lib_gpg_decrypt_dir $git_tomb_enc $git_tomb_dir || \
+    idm_exit 1 ERR "Could not extract tomb"
+
+  # Extract local repo
+  if lib_git_is_repo id ; then
+    # Local repo always win !, so we just sync
+    lib_log INFO "Local repo already present, we just start sync"
+    idm_tomb__sync $id
+  elif [ -f "$git_id_enc" ]; then
+    lib_gpg_decrypt_dir $git_id_enc $git_id_dir || \
+     idm_exit 1 ERR "Could not extract local repo"
+  else
+    idm_git__init $id &&
+      idm_tomb__sync $id ||
+        idm_exit 1 "Something wrong happened while working on local repo"
+
+  fi
+
+  # Sync :D
+  #idm_tomb__sync $id
+
+  lib_log NOTICE "Your tomb has been decrypted"
+
+}
+
+
+
+
 # We manage distribution of our repo
-# but maybe it should be the lib_git_local roles ...
+# but maybe it should be the liblib_git id roles ...
 idm_tomb__push ()
 {
   local id=$1
   local arg=${2-}
-  idm_tomb_require_enabled $id
+  idm_tomb_header $id
 
   # Manage argument
   if grep -sq "$arg" $IDM_CONFIG_DIR/git/$id/known_hosts ; then
@@ -169,9 +343,9 @@ idm_tomb__push ()
     for repo_name in $remotes; do
       lib_log INFO "Synchronising remote $repo_name ..."
 
-      _git_tomb fetch --all --tags && 
-        _git_tomb push -u $repo_name --all &&
-          _git_tomb push -u $repo_name --tags || 
+      lib_git id fetch --all --tags && 
+        lib_git id push -u $repo_name --all &&
+          lib_git id push -u $repo_name --tags || 
             lib_log WARN "Could not sync with $reponame"
     done
 
@@ -205,6 +379,58 @@ idm_tomb__push ()
   #fi
 
 }
+
+
+# COMPLETELY DEPRECATED, see with __rm
+idm_tomb__shred ()
+{
+  local id=$1
+  local arg=${2-}
+  local files=
+
+  idm_tomb_require_enabled $id
+
+  case $arg in
+    local) files="$git_id_dir" ;;
+    tomb) files="$git_tomb_dir" ;;
+    all) files="$git_tomb_dir $git_id_dir" ;;
+    full) files="$git_tomb_dir $git_id_dir $git_id_enc" ;;
+    disapear) files="$git_tomb_dir $git_id_dir $git_id_enc $( idm_git__get_files_of_interest $id | sed 's@^@~/@' | xargs )" ;;
+    *)
+      idm_exit 1 "You need to say: local|tomb|all|full"
+    ;;
+  esac
+
+  lib_log WARN "All these files will be IRREVOCABLY DELETED."
+  xargs -n 1 <<< "$files" | lib_log DUMP -
+
+  lib_log WARN "Do you want to continue ?"
+  idm_cli_timeout 1 || idm_exit 1 ERR "No data deleted"
+  
+  lib_log WARN "Run it yourself: rm -rf $files"
+  
+}
+
+idm_tomb__enable () { return 0; }
+idm_tomb__disable () { return 0; }
+idm_tomb__kill () { return 0; }
+
+
+## Internal functions
+##############################
+
+
+_git_tomb ()
+{
+  lib_git tomb $@ || return
+  rc=$?
+  #echo "RETURN2: $rc"
+  return $rc
+}
+
+
+## Module functions
+##############################
 
 idm_tomb_ssh_sync ()
 {
@@ -240,188 +466,28 @@ EOF
 }
 
 
-idm_tomb__encrypt ()
-{
-  local id=$1
 
-  # Sanity check: id and local repo
-  idm_tomb_require_enabled $id
-  idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue"
+# DEPRECATED, replaced by idm_tomb_header $id
+# idm_tomb_require_enabled ()
+# {
+#   local id=$1
+# 
+#   # Sanity check
+#   lib_id_has_config $id
+# 
+#   # Load local vars
+#   idm_tomb_header $id
+# }
 
-  # We check tomb repo here
-  lib_git_is_repo $git_tomb_dir $git_tomb_work_tree || \
-    idm_tomb__init $id || \
-      idm_exit 1 ERR "Tomb cannot be used without git"
-  
-  # Full sync both repo
-  idm_tomb__sync $id ||
-    idm_exit 1 ERR "Failed to push commits to tomb repo"
-
-  # Encrypt tomb data
-  lib_gpg_encrypt_dir $git_tomb_dir $git_tomb_enc _PASS || \
-    idm_exit 1 ERR "Failed to create tomb"
-
-  ## Encrypt local data
-  lib_gpg_encrypt_dir $git_local_dir $git_local_enc $GIT_AUTHOR_EMAIL || \
-    idm_exit 1 ERR "Could not create local repo data"
-
-  # Clean tomb
-  rm -rf $git_tomb_dir
-
-  lib_log NOTICE "Tomb has been closed into: $git_tomb_enc"
-}
-
-idm_tomb__decrypt ()
-{
-  local id=$1
-  shift || true
-  local opt=${@-}
-
-  # Sanity check
-  idm_tomb_require_enabled $id
-
-  # Check if tomb repo is absent
-  if lib_git_is_repo $git_tomb_dir $git_local_work_tree ; then
-    lib_log WARN "A local repo is already present, we will overwrite it. Do you want to continue?"
-    idm_cli_timeout 0 || idm_exit 1 ERR "Refuse to override existing repo"
-
-    # Let's not delete existing repo, just for fun and wee how git react :p
-  fi
-
-  # Extract tomb
-  lib_gpg_decrypt_dir $git_tomb_enc $git_tomb_dir || \
-    idm_exit 1 ERR "Could not extract tomb"
-
-  # Extract local repo
-  if idm_tomb_require_valid_local_repo; then
-    # Local repo always win !, so we just sync
-    lib_log INFO "Local repo already present, we just start sync"
-    idm_tomb__sync $id
-  else
-    lib_gpg_decrypt_dir $git_tomb_enc $git_tomb_dir || \
-     idm_exit 1 ERR "Could not extract tomb"
-  fi
-
-  # Sync :D
-  #idm_tomb__sync $id
-
-  lib_log NOTICE "Your tomb has been decrypted"
-
-
-}
-
-idm_tomb__init()
-{
-  local id=$1
-  shift
-
-  # Sanity check: id and local repo
-  idm_tomb_require_enabled $id
-  idm_tomb_require_valid_local_repo || idm_exit 1 ERR "Cound not continue" 
-    
-  # Load tomb environment from local
-  if [ ! -d "$git_tomb_dir" ] ; then
-    mkdir -p "$git_tomb_dir"
-    _git_tomb clone --bare $git_local_dir $git_tomb_dir || \
-      idm_exit 1 ERR "Could not create tomb repo"
-    lib_log NOTICE "Tomb repository has been created"
-  else
-    lib_log INFO "Tomb repository alreay exists"
-  fi
-
-  # Load tomb environment from encrypted_tomb
-  # Load tomb environment from user@server/encrypted.tomb
-
-  # Syncrhonise with tomb
-  if lib_git_has_commits $git_local_dir $git_local_work_tree ; then
-    idm_tomb__sync $id
-  fi
-
-}
-
-idm_tomb__shred ()
-{
-  local id=$1
-  local arg=${2-}
-  local files=
-
-  idm_tomb_require_enabled $id
-
-  case $arg in
-    local) files="$git_local_dir" ;;
-    tomb) files="$git_tomb_dir" ;;
-    all) files="$git_tomb_dir $git_local_dir" ;;
-    full) files="$git_tomb_dir $git_local_dir $git_local_enc" ;;
-    disapear) files="$git_tomb_dir $git_local_dir $git_local_enc $( idm_git__get_files_of_interest $id | sed 's@^@~/@' | xargs )" ;;
-    *)
-      idm_exit 1 "You need to say: local|tomb|all|full"
-    ;;
-  esac
-
-  lib_log WARN "All these files will be IRREVOCABLY DELETED."
-  xargs -n 1 <<< "$files" | lib_log DUMP -
-
-  lib_log WARN "Do you want to continue ?"
-  idm_cli_timeout 1 || idm_exit 1 ERR "No data deleted"
-  
-  lib_log WARN "Run it yourself: rm -rf $files"
-  
-}
-
-idm_tomb__enable () { return 0; }
-idm_tomb__disable () { return 0; }
-idm_tomb__kill () { return 0; }
-
-
-## IDM API functions
-##############################
-
-
-
-## Internal functions
-##############################
-
-idm_tomb_require_enabled ()
-{
-  local id=$1
-
-  # Sanity check
-  idm_validate id_config $id
-  
-  # Load local repo vars
-  idm_vars_git_local
-  git_local_enc=$IDM_DIR_CACHE/git/$id/local.git.tar.gz.asc
-
-  # Load tomb vars
-  idm_vars_git_tomb
-}
-
-
-_git_tomb ()
-{
-  lib_git_bin $git_tomb_dir $git_tomb_work_tree $@ || return
-  rc=$?
-  #echo "RETURN2: $rc"
-  return $rc
-}
-
-_git_local ()
-{
-  local rc=0
-  lib_git_bin $git_tomb_dir $git_tomb_work_tree $@ || rc=$?
-  return $rc
-}
-
-## Module functions
-##############################
-
-
-idm_tomb_require_valid_local_repo ()
-{
-
-  if ! lib_git_is_repo $git_local_dir $git_local_work_tree ; then
-    idm_exit 1 NOTICE "You need to have a local repo first"
-  elif ! lib_git_has_commits $git_local_dir $git_local_work_tree ; then
-    idm_exit 1 NOTICE "You need to commit all your changes"
-  fi
-}
+# DEPRECATED, use: lib_git_is_repo_with_commits id instead
+# idm_tomb_require_valid_local_repo ()
+# {
+# 
+#   if ! lib_git_is_repo id ; then
+#     lib_log NOTICE "You need to have a local repo first"
+#     return 1
+#   elif ! lib_git_is_repo_with_commits id ; then
+#     lib_log NOTICE "You need to commit all your changes"
+#     return 1
+#   fi
+# }

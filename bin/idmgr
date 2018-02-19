@@ -35,6 +35,8 @@ IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
+mkdir -p $IDM_CONFIG_DIR $IDM_DIR_ID $IDM_DIR_CACHE
+
 # Mod vars ...
 IDM_DISABLE_AUTO=
 
@@ -373,8 +375,11 @@ idm_exit ()
 
 
 idm_exit_trap () {
-    set +x
     rc=$?
+    set +x
+
+    echo "EXIT TRAP" >/dev/null
+
     if [[ $rc -ne 0 ]]; then
       lib_log ERR "The script exited with exit code: $rc"
       lib_trace || true
@@ -388,10 +393,12 @@ idm_exit_trap () {
 
 ## Data, tests
 
+# DEPRECATRED, replaced by lib_id
 # Should be replaced by idm_validate ?
 # Is a wrapper for enduser !!!
 idm_is_enabled ()
 {
+  lib_log DEPRECATED "call: idm_is enabled $@, use lib_id_is_enabled ${1-} instead"
   local id=${1}
   idm_validate is_enabled $id 
   {
@@ -400,8 +407,11 @@ idm_is_enabled ()
   }
 }
 
+
+# DEPRECATRED, replaced by lib_id
 idm_get ()
 {
+  lib_log DEPRECATED "all: idm_get $@, use lib_id_has_config instead"
   local item=$1
   local value=${2-}
 
@@ -432,8 +442,10 @@ idm_get ()
   esac
 }
 
+# DEPRECATRED, replaced by lib_id
 idm_validate ()
 {
+  lib_log DEPRECATED "call: idm_validate $@"
   local type=$1
   local value=${2-}
 
@@ -572,16 +584,16 @@ idm_menu_main ()
   else
 
     # Check id constraint
-    if idm_validate id_config $1 ; then
+    if lib_id_has_config ${1} &>/dev/null ; then
       menu=core
       action=enable
       id=$1
-    elif idm_validate id_config ${2-} ; then
+    elif lib_id_has_config ${2-_} &>/dev/null ; then
       menu=core
       action=$1
       id=$2
       shift 2 && opt=${@} || true
-    elif idm_validate id_config ${3-} ; then
+    elif lib_id_has_config ${3-_} &>/dev/null ; then
       menu=$1
       action=$2
       id=$3
