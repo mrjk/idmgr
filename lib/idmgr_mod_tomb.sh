@@ -85,20 +85,20 @@ idm_tomb__ls ()
 
     # Get status of tomb file
     if [ -f "$git_tomb_enc" ]; then
-      tomb_status=open
+      tomb_status=present
       tomb_date=$( lib_date_diff_human $(find $git_tomb_enc -printf "%Ts") )
       tomb_date=", $tomb_date old"
     else
-      tomb_status=closed
+      tomb_status=absent
     fi
 
     # Get status of git repo
     if [ -d "$git_tomb_dir" ]; then
-      git_status=present
+      git_status=open
       #git_date=$( lib_date_diff_human $(find $git_tomb_dir -maxdepth 0 -printf "%Ts") )
       #git_date=" $git_date"
     else
-      git_status=absent
+      git_status=closed
     fi
 
     # Display
@@ -109,7 +109,7 @@ idm_tomb__ls ()
     printf "    %-20s: %s\n" "tomb git dir" "$git_tomb_dir"
 
     # Show git remotes
-    if lib_git_is_repo id; then
+    if lib_git_is_repo id &>/dev/null ; then
       echo "  Git remotes:"
       lib_git id remote -v | sed 's/^/    /'
       echo "  Last commits:"
@@ -131,15 +131,11 @@ idm_tomb__rm ()
   idm_tomb_header $id
 
   # Delete local remote branch
-  if lib_git id remote show $git_id_tomb_repo_name &>/dev/null ; then
-    lib_git id remote rm $git_id_tomb_repo_name || 
-      {
-        lib_log INFO "Could not remote tomb remote"
-        return 1
-      }
-  else
-    lib_log INFO "Tomb remote is already absent"
-  fi
+  idm_tomb_remote_rm $git_id_tomb_repo_name ||
+    {
+      lib_log INFO "Could not remote tomb remote"
+      return 1
+    }
 
   # Delete git repo
   if [ -d "$git_tomb_dir" ] ; then
@@ -156,13 +152,6 @@ idm_tomb__init ()
 {
   local id=$1
 
-  # Check if local repo is not empty
-  lib_git_is_repo_with_commits id || 
-    {
-      lib_log INFO "Local repository must be present first"
-      return 0
-    }
-
   # Load tomb variables
   idm_tomb_header $id
 
@@ -177,7 +166,7 @@ idm_tomb__init ()
 
     lib_log WARN "An encrypted tomb has been found. Do you want to decrypt it? ($git_tomb_enc)"
     if idm_cli_timeout 1 || false ; then
-      lib_log "Extracting existing tomb ..."
+      lib_log INFO "Extracting existing tomb ..."
       idm_tomb__decrypt $id || 
         idm_exit 1 ERR "Failed to create tomb repo"
     else
@@ -189,18 +178,25 @@ idm_tomb__init ()
   # Create tomb: from other file #TODO
   # Create tomb: from other host #TODO
 
-  # Create tomb: from scratch
-  if [ -f "$git_tomb_enc" ]; then
+  # Create tomb: from scratch (last resort, as we want to avoid to much variants)
+  if [ ! -f "$git_tomb_enc" ]; then
+
+    # Check if local repo is not empty
+    lib_git_is_repo_with_commits id || 
+      {
+        lib_log INFO "Local repository must be present first"
+        return 1
+      }
+
+    # Create a NEW tomb
     mkdir -p "$git_tomb_dir"
     _git_tomb clone --bare $git_id_dir $git_tomb_dir || \
       idm_exit 1 ERR "Could not create tomb repo"
     lib_log NOTICE "Tomb repository has been created"
+
   fi
 
-  # Add tomb remote to local repo
-  lib_git id remote | grep -q $git_id_tomb_repo_name ||
-    lib_git id remote add $git_id_tomb_repo_name $git_tomb_dir ||
-      idm_exit 1 ERR "Failed to add tomb remote to local git"
+  idm_tomb_remote_add $git_id_tomb_repo_name $git_tomb_dir 
 
   # Syncrhonise with tomb
   #if lib_git_is_repo_with_commits id ; then
@@ -227,26 +223,26 @@ idm_tomb__sync ()
       }
 
   # Work on local
+  idm_tomb_remote_add $git_id_tomb_repo_name $git_tomb_dir
   {
     lib_git id fetch --all --tags && 
       lib_git id push -u $git_id_tomb_repo_name --all &&
         lib_git id push -u $git_id_tomb_repo_name --tags 
-  } >/dev/null  || idm_exit 1 ERR "Something where wrong while syncinc"
+  } || idm_exit 1 ERR "Something where wrong while syncing"
    
   # Notify user
   lib_log NOTICE "Tomb and local repository are now synced"
 }
 
-
-#### THIS PART BELOW NEED REFACTOOOORRRR
-
 idm_tomb__encrypt ()
 {
   local id=$1
 
-  #set -x
   idm_tomb_header $id
-  lib_git_is_all_commited id
+  #set -x
+
+  # We check local repo
+  idm_tomb_require_valid_local_repo
 
   # We check tomb repo here
   lib_git_is_repo tomb ||
@@ -264,36 +260,43 @@ idm_tomb__encrypt ()
   lib_gpg_encrypt_dir $git_tomb_dir $git_tomb_enc _PASS || \
     idm_exit 1 ERR "Failed to create tomb"
 
-  ## Encrypt local data
+  # Encrypt local data
   lib_gpg_encrypt_dir $git_id_dir $git_id_enc $GIT_AUTHOR_EMAIL || \
     idm_exit 1 ERR "Could not create local repo data"
 
   # Clean tomb
-  rm -rf $git_tomb_dir
+  #idm_tomb__rm $id
 
   lib_log NOTICE "Tomb has been closed into: $git_tomb_enc"
 }
 
+#### THIS PART BELOW NEED REFACTOOOORRRR
+
+
 idm_tomb__decrypt ()
 {
   local id=$1
-  shift || true
-  local opt=${@-}
 
-  # Sanity check
-  idm_tomb_require_enabled $id
+  idm_tomb_header $id
+
 
   # Check if tomb repo is absent
-  if lib_git_is_repo $git_tomb_dir $git_id_work_tree ; then
-    lib_log WARN "A local repo is already present, we will overwrite it. Do you want to continue?"
-    idm_cli_timeout 0 || idm_exit 1 ERR "Refuse to override existing repo"
-
+  if lib_git_is_repo tomb; then
+    lib_log WARN "A local tomb repo is already present, we will overwrite it. Do you want to continue?"
+    idm_cli_timeout 0 || 
+      idm_exit 1 ERR "Refuse to override existing repo"
     # Let's not delete existing repo, just for fun and wee how git react :p
   fi
 
   # Extract tomb
   lib_gpg_decrypt_dir $git_tomb_enc $git_tomb_dir || \
     idm_exit 1 ERR "Could not extract tomb"
+
+  # Check local repo
+  idm_tomb_require_valid_local_repo
+
+  # Add tomb to known remotes
+  idm_tomb_remote_add $git_id_tomb_repo_name $git_tomb_dir
 
   # Extract local repo
   if lib_git_is_repo id ; then
@@ -310,11 +313,7 @@ idm_tomb__decrypt ()
 
   fi
 
-  # Sync :D
-  #idm_tomb__sync $id
-
   lib_log NOTICE "Your tomb has been decrypted"
-
 }
 
 
@@ -432,6 +431,67 @@ _git_tomb ()
 ## Module functions
 ##############################
 
+idm_tomb_local_enc_is_present ()
+{
+  [ -f "$git_id_enc" ]
+}
+
+idm_tomb_tomb_enc_is_present ()
+{
+  [ -f "$git_tomb_enc" ]
+}
+
+idm_tomb_local_git_is_present ()
+{
+  [ -d "$git_id_dir" ] || return 1
+
+  if ! lib_git_is_repo_with_commits id &>/dev/null ; then
+    idm_exit 1 ERR "You need to commit something into your repo !!!"
+  fi
+
+  if ! lib_git_is_all_commited id &>/dev/null ; then
+    idm_exit 1 ERR "You need to commit all your changes!"
+  fi
+}
+
+idm_tomb_tomb_git_is_present ()
+{
+  [ -d "$git_tomb_dir" ] || return 1
+}
+
+
+
+################
+
+# Add tomb remote to local repo
+idm_tomb_remote_add ()
+{
+  local name=$1
+  local url=$2
+
+  if lib_git id remote | grep -q $name; then
+    lib_log INFO "The remote '$name' is already present"
+  else
+    lib_git id remote add $name $url ||
+      idm_exit 1 ERR "Failed to add '$name' remote to local git"
+  fi
+}
+
+idm_tomb_remote_rm ()
+{
+  local name=$1
+
+  if lib_git id remote show $name &>/dev/null ; then
+    lib_git id remote rm $name || 
+      {
+        lib_log INFO "Could not remove '$name' remote from local git"
+        return 1
+      }
+  else
+    lib_log INFO "The remote '$name' is already absent"
+  fi
+}
+
 idm_tomb_ssh_sync ()
 {
   local host=$1
@@ -480,14 +540,37 @@ EOF
 # }
 
 # DEPRECATED, use: lib_git_is_repo_with_commits id instead
-# idm_tomb_require_valid_local_repo ()
-# {
-# 
-#   if ! lib_git_is_repo id ; then
-#     lib_log NOTICE "You need to have a local repo first"
-#     return 1
-#   elif ! lib_git_is_repo_with_commits id ; then
-#     lib_log NOTICE "You need to commit all your changes"
-#     return 1
-#   fi
-# }
+idm_tomb_require_valid_local_repo ()
+{
+
+  # Check if local repo is present
+  if ! lib_git_is_repo id ; then #&>/dev/null ; then
+
+  echo "YOOOOOOOOOOOOOOOO"
+
+    if [ -f "$git_tomb_enc" ]; then
+    lib_gpg_decrypt_dir $git_tomb_enc $git_tomb_dir || 
+      {
+        lib_log ERR "Could not extract tomb"
+        return 1
+      }
+    else
+      lib_log ERR "You need to have a local repo first"
+      return 1
+    fi
+
+  fi
+
+  # Check if local repo is valid
+  if ! lib_git_is_repo_with_commits id &>/dev/null ; then
+    lib_log ERR "You need to commit something into your repo !!!"
+    return 1
+  fi
+
+  if ! lib_git_is_all_commited id; then
+    lib_log ERR "You need to commit all your changes!"
+    return 1
+  fi
+
+    
+}

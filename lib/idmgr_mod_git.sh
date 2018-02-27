@@ -16,8 +16,8 @@ idm_git_header ()
   git_id_dir=$git_dir
   git_id_work_tree=$git_work_tree
 
-  mkdir -p $git_id_dir $git_id_work_tree ||
-    idm_exit 1 ERR "Could not create dir: $git_id_dir $git_id_work_tree"
+  mkdir -p $(dirname $git_dir) $(dirname $git_id_config) ||
+    idm_exit 1 ERR "Could not create dir: $(dirname $git_dir) $(dirname $git_id_config)"
 }
 
 
@@ -128,7 +128,7 @@ idm_git__scan ()
     lib_log INFO "There are the files we could add:"
     lib_git id status -s
     
-    lib_log PROMPT "Do you want to add these files to your repo?"
+    lib_log ASK "Do you want to add these files to your repo?"
     if idm_cli_timeout 1; then
       
       lib_git id commit --file=- <<< "Add: Import $(hostname) data" ||
@@ -156,11 +156,12 @@ idm_git__ls ()
   idm_git_header $id
 
   # Check if it is a valid repo
-  lib_git_is_repo id ||
-    return 1
-
-  # Show files
-  lib_git id ls-files | sort | sed 's/^/  /'
+  if lib_git_is_repo id &> /dev/null; then
+    # Show files
+    lib_git id ls-files | sort | sed 's/^/  /'
+  else
+    echo "  Repository is absent"
+  fi
 }
 
 idm_git__enable ()

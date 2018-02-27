@@ -109,10 +109,10 @@ idm_id__ls ()
   local active
   #set -x
 
-  for id in $(idm_get all_id); do
+  for id in $(lib_id_get_all_id); do
 
     # Check if id is valid
-    idm_validate id_config $id || continue
+    lib_id_has_config $id || continue
     
     # Detect if it is enalbed or not
     if [ "$id" == "${SHELL_ID-}" ]; then
@@ -123,7 +123,7 @@ idm_id__ls ()
 
     # Parse the config
     echo $(
-      eval "$(idm_get id_config $id)"
+      eval "$(lib_id_get_config $id)"
       echo "$active:$id::::${common_name-} (${email-})"
     )
   done | column -t -s:  -o' ' #| lib_log DUMP -

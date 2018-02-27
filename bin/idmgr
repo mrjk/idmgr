@@ -112,8 +112,8 @@ idm_core__enable ()
   #set -x
 
   # Local checks
-  idm_validate id $id || idm_exit 1 ERR "You must provide an id"
-  idm_validate id_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
+  #idm_validate id $id || idm_exit 1 ERR "You must provide an id"
+  lib_id_has_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
 
   # Check if workspace is enabled
   #idm_validate is_enabled $id 
@@ -399,6 +399,7 @@ idm_exit_trap () {
 idm_is_enabled ()
 {
   lib_log DEPRECATED "call: idm_is enabled $@, use lib_id_is_enabled ${1-} instead"
+  lib_trace
   local id=${1}
   idm_validate is_enabled $id 
   {
@@ -411,7 +412,8 @@ idm_is_enabled ()
 # DEPRECATRED, replaced by lib_id
 idm_get ()
 {
-  lib_log DEPRECATED "all: idm_get $@, use lib_id_has_config instead"
+  lib_log DEPRECATED "call: idm_get $@, use lib_id_has_config instead"
+  lib_trace
   local item=$1
   local value=${2-}
 

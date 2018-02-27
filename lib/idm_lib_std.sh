@@ -148,7 +148,7 @@ lib_log ()
 { 
 
   set +x
-  [[ "${1-}" =~ ERR|WARN|TIP|NOTICE|INFO|DEBUG|RUN|CODE|DUMP ]] ||
+  [[ "${1-}" =~ ERR|WARN|TIP|NOTICE|INFO|DEBUG|RUN|CODE|DUMP|DEPRECATED|ASK ]] ||
     {
       lib_log ERR "Wrong message level while calling '${1-}'"
       return 1
@@ -178,7 +178,7 @@ lib_log ()
     ERR)
       color='\033[0;31m'
       ;;
-    WARN|TIP)
+    WARN|TIP|DEPRECATED)
       color='\033[0;33m'
       ;;
     NOTICE)
