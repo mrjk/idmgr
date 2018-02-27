@@ -41,6 +41,12 @@ idm_git__help ()
   printf "  %-20s: %s\n" "git disable" "Disable as default git"
   printf "  %-20s: %s\n" "git kill" "Like disable"
   echo  
+  printf "  %-20s: %s\n" "git repo ls" "List remotes"
+  printf "  %-20s: %s\n" "git repo add" "Add remote"
+  printf "  %-20s: %s\n" "git repo rm" "Delete remote"
+  printf "  %-20s: %s\n" "git repo check" "Check remote availability"
+  printf "  %-20s: %s\n" "git repo sync" "Sync with remotes"
+  echo  
   printf "  %-20s: %s\n" "git --help" "Git wrapper"
   printf "  %-20s: %s\n" "git [cmd]" "Git wrapper"
 
@@ -103,6 +109,136 @@ idm_git__init ()
   # Notify user
   lib_log NOTICE "Repository has been created into '$git_dir'"
 }
+
+
+idm_git__repo()
+{
+  local id=$1
+  local sub=$2
+  shift 2
+  local opts=${@-}
+  idm_git__repo_$sub $id $opts
+}
+
+idm_git__repo_ls()
+{
+  local id=$1
+  local name=${2-}
+
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+  if [ -z "$name" ]; then
+    git config -f $git_id_config -l
+  else
+    git config -f $git_id_config --get idmgr-sources.$name
+    #git config -f $git_id_config --get-all idmgr-sources
+  fi
+
+}
+
+idm_git__repo_add ()
+{
+  local id=$1
+  local name=$2
+  local uri=$3
+
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+  git config -f $git_id_config --add idmgr-sources.$name $uri
+
+}
+idm_git__repo_rm ()
+{
+
+  local id=$1
+  local name=$2
+
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+  git config -f $git_id_config --unset idmgr-sources.$name
+
+}
+
+idm_git__repo_check () 
+{
+  local id=$1
+  shift 1
+  opts=${*-}
+  local static_repos=
+  local fqdn=
+
+  # Loading
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+
+  # load infos
+  static_repos=$( git config -f $git_id_config -l | grep ^idmgr-sources)
+  fqdn=$( hostname -f )
+
+  # Load static remotes
+  while IFS== read -r name uri; do
+    # Pure bash magic !
+    local name=${name#idmgr-sources.}
+    local user=${uri%%@*}
+    local path=${uri#*:}
+    local host=${uri#*@}
+    host=${host%%:$path}
+
+    # Skip if localhost
+    if [[ "$host" =~ ^$fqdn ]]; then
+      lib_log INFO "Skip local repo $name ($host)"
+      continue
+    fi
+
+    # Test ssh conenction
+    lib_log INFO "Testing: $user on $host in $path ..."
+    if ssh -l $user $host "ls -ahl $path > /dev/null "; then
+      lib_git id config --add idmgr-online-sources.$name $uri
+
+      if ! lib_git id remote get-url $name &>/dev/null; then
+        lib_git id remote add $name $uri
+      fi
+      lib_log INFO "Remote $name is online"
+    else
+      lib_git id config --unset idmgr-online-sources.$name
+
+      if lib_git id remote $name &>/dev/null; then
+        lib_git id remote remove $name 
+      fi
+
+      lib_log INFO "Remote $name is offline"
+      continue
+    fi
+      
+  done <<< "$static_repos"
+
+}
+
+# Do a git fetch on all remotes
+idm_git__repo_sync ()
+{
+  local id=$1
+  shift 1
+  opts=${*-}
+
+  # Loading
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+
+  # Check repo presence ?
+  idm_git__repo_check $id
+
+  # Sync
+  lib_git id fetch --all
+  # If i well undertood, never do a push !
+
+}
+
 
 idm_git__scan ()
 {
@@ -170,9 +306,8 @@ idm_git__enable ()
   idm_git_header $id
 
   cat <<EOF -
-echo "INFO: Run this if your want to enable native git"
-echo export GIT_DIR="$git_id_dir"
-echo export GIT_WORK_TREE="$git_id_work_tree"
+export GIT_DIR="$git_id_dir"
+export GIT_WORK_TREE="$git_id_work_tree"
 EOF
 
 }
@@ -193,6 +328,8 @@ idm_git_get_files_of_interest ()
 {
   local id=${1}
 
+  git_id_config
+
   find_args="-maxdepth 2 -type f "
   {
     find $HOME/.ssh/ $find_args -name "${id}*" 2>/dev/null
@@ -201,6 +338,8 @@ idm_git_get_files_of_interest ()
     find $GNUPGHOME/private-keys-v1.d/ $find_args 2>/dev/null
     find $PASSWORD_STORE_DIR/ $find_args 2>/dev/null
     find $IDM_DIR_ID/ $find_args -name "$id*" 2>/dev/null
+    find $IDM_CONFIG_DIR/ $find_args -name "*$id*" 2>/dev/null
+    echo "${git_id_config}"
   } | sed -E "s@$HOME/?@@g"
 
 }
