@@ -14,7 +14,7 @@ idm_gpg__help ()
 idm_gpg__enable ()
 {
   local id=${1}
-  idm_validate id_config $id
+  lib_id_has_config $id
 
   # Source environment
   if [ -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env" ]; then
@@ -42,14 +42,14 @@ idm_gpg__enable ()
 idm_gpg__disable ()
 {
   local id=${1}
-  idm_validate id_config $id
+  lib_id_has_config $id
   echo "unset GPG_AGENT_INFO GNUPGHOME GPG_TTY"
 }
 
 idm_gpg__kill ()
 {
   local id=${1}
-  idm_is_enabled $id
+  lib_id_is_enabled $id
 
   gpgconf --kill gpg-agent
   lib_log NOTICE "Kill gpg-agent ..."
@@ -64,7 +64,7 @@ idm_gpg__kill ()
 idm_gpg__ls ()
 {
   local id=${1}
-  idm_validate is_enabled $id || return 0
+  lib_id_is_enabled $id || return 0
 
   gpg --list-keys | sed 's/^/  /' #| lib_log DUMP -
 }
@@ -72,7 +72,7 @@ idm_gpg__ls ()
 idm_gpg__new ()
 {
   local id=${1}
-  idm_is_enabled $id
+  lib_id_is_enabled $id
   key="$( idm_gpg_match_one_pubkey $id )"
 
   idm_gpg_cli_helper $id sub
@@ -85,7 +85,7 @@ idm_gpg__new ()
 idm_gpg__init ()
 {
   local id=${1}
-  idm_is_enabled $id
+  lib_id_is_enabled $id
 
   ! idm_gpg_match_one_pubkey $id &>/dev/null || \
     idm_exit 1 "You already have an id !"

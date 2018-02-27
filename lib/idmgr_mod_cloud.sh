@@ -19,7 +19,7 @@ idm_cloud__ls ()
 {
   local id=${1}
 
-  if idm_validate is_enabled $id; then
+  if lib_id_is_enabled $id; then
       if [ -f "${OS_CLOUD-}" ]; then
         echo "  enabled ($OS_CLOUD)"
       else

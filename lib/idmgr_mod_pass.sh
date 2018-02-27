@@ -23,7 +23,7 @@ idm_pass ()
   # Interncal override case
 
   # Fallback to command
-  idm_is_enabled $id
+  lib_id_is_enabled $id
   PASSWORD_STORE_DIR=~/.config/pass/${id} pass $action ${@-}
 
 }
@@ -31,7 +31,7 @@ idm_pass ()
 idm_pass__ls ()
 {
   local id=${1}
-  idm_validate is_enabled $id || return 0
+  lib_id_is_enabled $id || return 0
 
   PASSWORD_STORE_DIR=~/.config/pass/${id} pass ls | sed 's/^/  /'
 }
@@ -52,7 +52,7 @@ idm_pass__help ()
 idm_pass__enable ()
 {
   local id=${1}
-  ! idm_validate id_config $id
+  ! lib_id_has_config $id
   
   echo "export PASSWORD_STORE_DIR=~/.config/pass/${id}"
 }
@@ -61,7 +61,7 @@ idm_pass__enable ()
 idm_pass__disable ()
 {
   local id=${1}
-  idm_validate id_config $id
+  lib_id_has_config $id
 
   echo "unset PASSWORD_STORE_DIR"
 }

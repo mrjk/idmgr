@@ -56,7 +56,7 @@ idm_ssh__ls ()
   local opt=${2:--l}
   local opt=-l
 
-  idm_validate is_enabled $id || return 0
+  lib_id_is_enabled $id || return 0
 
   { ssh-add $opt || true ; } | sed 's/^/  /'
 }
@@ -64,8 +64,8 @@ idm_ssh__ls ()
 idm_ssh__disable ()
 {
   local id=$1
-  #idm_is_enabled $id
-  idm_validate id_config $id
+  #lib_id_is_enabled $id
+  lib_id_has_config $id
 
   # Return portion of code to clean
   echo "unset SSH_AUTH_SOCK SSH_AGENT_PID"
@@ -75,7 +75,7 @@ idm_ssh__disable ()
 idm_ssh__enable ()
 {
   local id=$1
-  idm_validate id_config $id
+  lib_id_has_config $id
 
   # Source environment
   if [ -f "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" ] ; then
@@ -104,7 +104,7 @@ idm_ssh__kill () {
   local id=$1
   local run_dir="${XDG_RUNTIME_DIR}/ssh-agent/${id}"
 
-  idm_is_enabled $id
+  lib_id_is_enabled $id
 
   #lib_log NOTICE "Cleaning ssh-agent ..."
 
@@ -220,7 +220,8 @@ idm_ssh_add ()
   local key=${2-}
   local maxdepth=1
 
-  idm_is_enabled $id
+  #lib_id_is_enabled $id
+  lib_id_is_enabled $id
 
 
   if [[ ! -z $key ]]; then

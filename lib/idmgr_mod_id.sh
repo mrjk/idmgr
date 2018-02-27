@@ -70,8 +70,8 @@ idm_id__new ()
   local id=${2:-$1}
 
   # Local checks
-  idm_validate id $id || idm_exit 1 "Id '$id' is not valid"
-  idm_validate id_config $id && idm_exit 1 "Configuration '$id' already exists"
+  lib_id_is_valid_syntax $id || idm_exit 1 "Id '$id' is not valid"
+  lib_id_has_config $id && idm_exit 1 "Configuration '$id' already exists"
 
   # Create new id
   conf="$IDM_DIR_ID/$id.env"
@@ -92,14 +92,14 @@ idm_id__show ()
   local conf
 
   # Local checks
-  idm_validate id_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
+  lib_id_has_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
 
   # Edit id
   conf="$IDM_DIR_ID/$id.env"
 
   # Notice user
   lib_log INFO "Id '$id' configuration:"
-  idm_get id_config $id | lib_log CODE -
+  lib_id_has_config $id | lib_log CODE -
 #  cat $conf | lib_log CODE
 }
 
@@ -136,7 +136,7 @@ idm_id__edit ()
   local md5 conf
 
   # Local checks
-  idm_validate id_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
+  lib_id_has_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
 
   # Edit id
   conf="$IDM_DIR_ID/$id.env"
@@ -174,7 +174,7 @@ idm_id__dump ()
   for id in $(idm_get all_id); do
     #lib_log NOTICE "Identity $id"
     {
-      idm_get id_config $id
+      lib_id_has_config $id
       echo " " 
     } | lib_log CODE -
   done
@@ -198,8 +198,8 @@ idm_id__rm ()
   local id=${1}
 
   # Local checks
-  idm_validate id $id || idm_exit 1 ERR "Id '$id' is not valid"
-  #idm_validate id_config $id && idm_exit 1 "Configuration '$id' already exists"
+  lib_id_is_valid_syntax $id || idm_exit 1 ERR "Id '$id' is not valid"
+  #lib_id_has_config $id && idm_exit 1 "Configuration '$id' already exists"
 
 
   # Delete config

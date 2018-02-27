@@ -170,8 +170,9 @@ idm_git__enable ()
   idm_git_header $id
 
   cat <<EOF -
-export GIT_DIR="$git_local_dir"
-export GIT_WORK_TREE="$git_local_work_tree"
+echo "INFO: Run this if your want to enable native git"
+echo export GIT_DIR="$git_id_dir"
+echo export GIT_WORK_TREE="$git_id_work_tree"
 EOF
 
 }

@@ -112,7 +112,7 @@ idm_core__enable ()
   #set -x
 
   # Local checks
-  #idm_validate id $id || idm_exit 1 ERR "You must provide an id"
+  #lib_id_is_valid_syntax $id || idm_exit 1 ERR "You must provide an id"
   lib_id_has_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
 
   # Check if workspace is enabled
@@ -140,8 +140,7 @@ idm_core__enable ()
 idm_core__disable ()
 {
   local id=${1}
-  #idm_is_enabled $id
-  idm_validate is_enabled $id
+  lib_id_is_enabled $id
 
   # Reverse module unloading
   IDM_MOD_ORDER="$( lib_reverse_doted_list $IDM_MOD_ORDER )" 
@@ -154,7 +153,7 @@ idm_core__disable ()
 idm_core__kill ()
 {
   local id=${1}
-  idm_is_enabled $id
+  lib_id_is_enabled $id
 
   # Reverse module killing
   IDM_MOD_ORDER="$( lib_reverse_doted_list $IDM_MOD_ORDER )" 
@@ -215,7 +214,7 @@ idm_core__sourced_words()
   local words=
 
   # When we are asking to output source words
-  words="enable disable kill shell quit q $(idm_get all_id | xargs)"
+  words="enable disable kill shell quit q $(lib_id_get_all_id | xargs)"
 
   echo ":${words// /:}:"
 
@@ -396,97 +395,105 @@ idm_exit_trap () {
 # DEPRECATRED, replaced by lib_id
 # Should be replaced by idm_validate ?
 # Is a wrapper for enduser !!!
-idm_is_enabled ()
-{
-  lib_log DEPRECATED "call: idm_is enabled $@, use lib_id_is_enabled ${1-} instead"
-  lib_trace
-  local id=${1}
-  idm_validate is_enabled $id 
-  {
-    lib_log WARN "You need to activate an id first"
-    return 1
-  }
-}
+# idm_is_enabled ()
+# {
+#   lib_log DEPRECATED "call: idm_is enabled $@, use lib_id_is_enabled ${1-} instead"
+#   lib_trace
+#   local id=${1}
+#   idm_validate is_enabled $id 
+#   {
+#     lib_log WARN "You need to activate an id first"
+#     return 1
+#   }
+# }
 
 
-# DEPRECATRED, replaced by lib_id
-idm_get ()
-{
-  lib_log DEPRECATED "call: idm_get $@, use lib_id_has_config instead"
-  lib_trace
-  local item=$1
-  local value=${2-}
+#  # DEPRECATRED, replaced by lib_id
+#  idm_get ()
+#  {
+#    lib_log DEPRECATED "call: idm_get $@, use lib_id_has_config instead"
+#    lib_trace
+#    local item=$1
+#    local value=${2-}
+#  
+#    case $item in
+#      all_id)
+#      # idm_get all_id 
+#      # => lib_id_get_all_id
+#        for id in $( find $IDM_DIR_ID -type f -name '*.env' 2>/dev/null ); do
+#          id=${id%%\.env}
+#          echo "${id##*/}"
+#        done 
+#      ;;
+#  
+#      all_id_files)
+#      # => lib_id_get_all_file
+#        ls $IDM_DIR_ID/*.env || true
+#      ;;
+#  
+#      id_config)
+#      # => lib_id_get_config
+#        if [ -f "$IDM_DIR_ID/$value.env" ]; then
+#          echo "id=$value"
+#          cat $IDM_DIR_ID/$value.env
+#        else
+#          return 1
+#        fi
+#      ;;
+#  
+#      *)
+#        lib_log ERR "Cannot get item '$item'"
+#      ;;
+#    esac
+#  }
 
-  case $item in
-    all_id)
-      for id in $( find $IDM_DIR_ID -type f -name '*.env' 2>/dev/null ); do
-        id=${id%%\.env}
-        echo "${id##*/}"
-      done 
-    ;;
-
-    all_id_files)
-      ls $IDM_DIR_ID/*.env || true
-    ;;
-
-    id_config)
-      if [ -f "$IDM_DIR_ID/$value.env" ]; then
-        echo "id=$value"
-        cat $IDM_DIR_ID/$value.env
-      else
-        return 1
-      fi
-    ;;
-
-    *)
-      lib_log ERR "Cannot get item '$item'"
-    ;;
-  esac
-}
-
-# DEPRECATRED, replaced by lib_id
-idm_validate ()
-{
-  lib_log DEPRECATED "call: idm_validate $@"
-  local type=$1
-  local value=${2-}
-
-  case $type in
-    id_filter|id)
-      [ "$value" != '_' ] && \
-        [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return $?
-    ;;
-    id_config)
-      if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
-        return 0
-      fi
-    ;;
-    is_enabled)
-      if [[ -z "${value-}" && "${value-}" != '_' ]]; then
-        if [ -z "${SHELL_ID-}" ] ; then
-          return 1
-        else
-          return 0
-        fi
-      else
-        if [ "${value-}" == "${SHELL_ID-}" ]; then
-          return 0
-        else
-          return 1
-        fi
-      fi
-    ;;
-    is_disabled)
-      [ -z "${SHELL_ID-}" ] && return $?
-    ;;
-      
-    *)
-      lib_log ERR "Cannot validate type '$type'"
-    ;;
-  esac
-
-  return 1
-}
+#  # DEPRECATRED, replaced by lib_id
+#  idm_validate ()
+#  {
+#    #lib_log DEPRECATED "call: idm_validate $@, sed with: lib_id_has_config or equivalent"
+#    local type=$1
+#    local value=${2-}
+#  
+#    case $type in
+#      id_filter|id)
+#      lib_log DEPRECATED "call: idm_validate id_filter $@, sed with: lib_id_is_valid_syntax \$id"
+#        [ "$value" != '_' ] && \
+#          [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return $?
+#      ;;
+#      id_config)
+#        lib_log DEPRECATED "call: idm_validate id_config $@, sed with: lib_id_has_config \$id"
+#        if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
+#          return 0
+#        fi
+#      ;;
+#      is_enabled)
+#        lib_log DEPRECATED "call: idm_validate is_enabled $@, sed with: lib_id_is_enabled \$id"
+#        if [[ -z "${value-}" && "${value-}" != '_' ]]; then
+#          if [ -z "${SHELL_ID-}" ] ; then
+#            return 1
+#          else
+#            return 0
+#          fi
+#        else
+#          if [ "${value-}" == "${SHELL_ID-}" ]; then
+#            return 0
+#          else
+#            return 1
+#          fi
+#        fi
+#      ;;
+#      is_disabled)
+#        lib_log DEPRECATED "call: idm_validate is_disabled $@, sed with: ! lib_id_is_enabled \$id"
+#        [ -z "${SHELL_ID-}" ] && return $?
+#      ;;
+#        
+#      *)
+#        lib_log ERR "Cannot validate type '$type'"
+#      ;;
+#    esac
+#  
+#    return 1
+#  }
 
 
 ## User interface
