@@ -205,6 +205,7 @@ idm_git__repo_check ()
 
     # Test ssh conenction
     lib_log INFO "Testing: $name $user on $host in $path ..."
+    set -x
     ssh_script="$(idm_git_ssh_scan_script $id $path)"
     path=$(ssh -l $user $host "$ssh_script" < /dev/null || true )
 
@@ -246,6 +247,8 @@ idm_git_ssh_scan_script ()
     echo "$path"
   elif [ -d \${XDG_CACHE_HOME:-~/.cache}/$path/refs ]; then
     echo \${XDG_CACHE_HOME:-~/.cache}/$path
+  elif [ -d \${XDG_CACHE_HOME:-~/.cache}/idmgr/git/$id/local.git/refs ]; then
+    echo \${XDG_CACHE_HOME:-~/.cache}/idmgr/git/$id/local.git
   elif [ -d \${XDG_CACHE_HOME:-~/.local/cache}/idmgr/git/$id/local.git/refs ]; then
     echo \${XDG_CACHE_HOME:-~/.local/cache}/idmgr/git/$id/local.git
   fi
@@ -270,8 +273,11 @@ idm_git__repo_sync ()
   #idm_git__repo_check $id
 
   # Sync
-  lib_git id fetch --all
-  # If i well undertood, never do a push !
+  for r in $( lib_git id remote | grep -v tomb ); do
+    [ ! -z "$r" ] || continue
+    lib_git id fetch $r master
+    # If i well undertood, never do a push !
+  done
 
 }
 
