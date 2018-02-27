@@ -181,6 +181,15 @@ idm_git__repo_check ()
 
   # Load static remotes
   while IFS== read -r name uri; do
+
+    # Guess missing fields
+    if ! [[ "$uri" =~ @ ]]; then
+      uri="${USER:-(id -n -u)}@$uri"
+    fi
+    if ! [[ "$uri" =~ : ]]; then
+      uri="$uri:"
+    fi
+
     # Pure bash magic !
     local name=${name#idmgr-sources.}
     local user=${uri%%@*}
@@ -195,14 +204,19 @@ idm_git__repo_check ()
     fi
 
     # Test ssh conenction
-    lib_log INFO "Testing: $user on $host in $path ..."
-    if ssh -l $user $host "ls -ahl $path > /dev/null "; then
+    lib_log INFO "Testing: $name $user on $host in $path ..."
+    ssh_script="$(idm_git_ssh_scan_script $id $path)"
+    path=$(ssh -l $user $host "$ssh_script" < /dev/null || true )
+
+    # Act according result
+    if [ ! -z "$path" ]; then
       lib_git id config --add idmgr-online-sources.$name $uri
 
       if ! lib_git id remote get-url $name &>/dev/null; then
-        lib_git id remote add $name $uri
+        lib_git id remote add $name $user@$host:$path
       fi
       lib_log INFO "Remote $name is online"
+      continue
     else
       lib_git id config --unset idmgr-online-sources.$name
 
@@ -214,8 +228,30 @@ idm_git__repo_check ()
       continue
     fi
       
-  done <<< "$static_repos"
+  done <<<$static_repos
 
+}
+
+idm_git_ssh_scan_script ()
+{
+  local id=$1
+  local path=${2-}
+
+
+  # Script
+  cat <<EOF -
+
+  # Define path
+  if [ -d "$path/refs" ]; then
+    echo "$path"
+  elif [ -d \${XDG_CACHE_HOME:-~/.cache}/$path/refs ]; then
+    echo \${XDG_CACHE_HOME:-~/.cache}/$path
+  elif [ -d \${XDG_CACHE_HOME:-~/.local/cache}/idmgr/git/$id/local.git/refs ]; then
+    echo \${XDG_CACHE_HOME:-~/.local/cache}/idmgr/git/$id/local.git
+  fi
+  exit 1
+
+EOF
 }
 
 # Do a git fetch on all remotes
@@ -231,7 +267,7 @@ idm_git__repo_sync ()
   idm_git_header $id
 
   # Check repo presence ?
-  idm_git__repo_check $id
+  #idm_git__repo_check $id
 
   # Sync
   lib_git id fetch --all
