@@ -208,7 +208,7 @@ lib_log ()
   esac
 
   if [[ -n "$level" ]]; then
-    printf "$color%*.6s$reset: %s\n" 6 "${level}_____" "$msg" >&2
+    >&2 printf "$color%*.6s$reset: %s\n" 6 "${level}_____" "$msg" # >&2
   else
     echo "Error while log output msg: $msg"
   fi

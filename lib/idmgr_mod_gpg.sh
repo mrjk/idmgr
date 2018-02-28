@@ -5,7 +5,15 @@ IDM_MOD_DEPS="id"
 
 idm_gpg__help ()
 {
-  echo "Not implemented yet"
+  local id=$1
+
+  echo "gpg"
+  printf "  %-20s: %s\n" "gpg ls" "Show private keys"
+  printf "  %-20s: %s\n" "gpg init " "Create new identity"
+  printf "  %-20s: %s\n" "gpg new " "Create new sub-identity"
+  printf "  %-20s: %s\n" "gpg del" "Delete identity"
+  echo ""
+
 }
 
 ## Required functions
@@ -76,7 +84,11 @@ idm_gpg__new ()
 {
   local id=${1}
   lib_id_is_enabled $id
-  key="$( idm_gpg_match_one_pubkey $id )"
+  key="$( idm_gpg_match_one_pubkey $id )" 2>/dev/null ||
+    {
+      lib_log ERR "You need to have a valid key${key:+: '$key'}"
+      return 1
+    }
 
   idm_gpg_cli_helper $id sub
   gpg --edit-key $key addkey 
@@ -89,16 +101,57 @@ idm_gpg__init ()
 {
   local id=${1}
   lib_id_is_enabled $id
+  idm_gpg_header $id
 
   ! idm_gpg_match_one_pubkey $id &>/dev/null || \
     idm_exit 1 "You already have an id !"
 
+  # Check entropy
+  [ "$( cat /proc/sys/kernel/random/entropy_avail || echo 0)" -lt 3000  ] &&
+    lib_log ERR "You are low in entropy, operation may never end up :/"
+
   # Generate top secret id
   idm_gpg_cli_helper $id main
-  gpg --gen-key
+
+  (
+    # Get config
+    eval "$( lib_id_get_config $id )"
+
+    if [ ${#common_name} -lt 5 ]; then
+
+      if [ ${#id} -lt 5 ]; then
+        key_name=$email
+      else
+        key_name=$id
+      fi
+    else
+      key_name=$common_name
+    fi
+
+    # Parse file
+    key_type=RSA \
+      key_lenght=4096 \
+      subkey_type=RSA\
+      subkey_lenght=4096 \
+      key_name=$key_name \
+      key_email=$email \
+      key_expire=2y \
+      key_sec=$gpghome/$id.enc \
+      key_pub=$gpghome/$id.pub \
+      envsubst < $IDM_DIR_ROOT/shell/gpg_gen.tpl > $IDM_DIR_CACHE/gpg_gen_$id
+  )
+
+  # Generate key
+  gpg --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
+  #gpg --verbose --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
+  #echo $?
+  #gpg --gen-key
+  #gpg --full-generate-key
 
   # Generate encyption key
-  idm_gpg_new $id
+  #idm_gpg__new $id
+
+  # See:https://gist.github.com/TheFox/cf3e67984ea794e612d5
 
   lib_log NOTICE "Your personal key $name is ready :)"
 }
@@ -109,11 +162,15 @@ idm_gpg__del ()
   local id=${1}
   local key=${2:-$1}
 
+  # TOFIX:
+  # It is not clear here if we delete private or public keys!
+
   # Scan key
   key=$(idm_gpg_match_one_pubkey $key)
 
-  lib_log WARN "Do you really want to destroy the '$key' key?"
-  idm_cli_timeout 1 || rc=$?
+  # Gpg is annoying enough ...
+  #lib_log WARN "Do you really want to destroy the '$key' key?"
+  #idm_cli_timeout 1 || rc=$?
 
   gpg --delete-key "$key" || true
   gpg --delete-secret-key "$key" || true
@@ -121,17 +178,41 @@ idm_gpg__del ()
 }
 
 
+idm_gpg__config ()
+{
+  local id=$1
+  idm_gpg_header $id
+
+  # See:
+  # https://lecorvaisier.ca/2018/02/21/signing-your-commits-with-gpg/
+  # https://blog.eleven-labs.com/en/openpgp-almost-perfect-key-pair-part-1/
+  # https://blog.tinned-software.net/create-gnupg-key-with-sub-keys-to-sign-encrypt-authenticate/
+  # Best practices: https://blog.josefsson.org/tag/gpg-agent/
+
+  envsubst < $IDM_DIR_ROOT/shell/gpg_conf > $gpgconf
+
+
+}
+
 ## Internal functions
 ##########################################
+
+idm_gpg_header ()
+{
+  local id=${1}
+  runtime=${XDG_RUNTIME_DIR}/pgp-agent/$id
+  gpghome=~/.config/gpg/$id
+  gpgconf=$gpghome/gpg.conf
+
+  export GPG_TTY=$(tty)
+  export GNUPGHOME=$gpghome
+
+}
 
 idm_gpg_start ()
 {
   local id=${1}
-  local gpghome=~/.config/gpg/$id
-  local runtime=${XDG_RUNTIME_DIR}/pgp-agent/$id
-
-  export GPG_TTY=$(tty)
-  export GNUPGHOME=$gpghome
+  idm_gpg_header $id
 
   # Ensure directories exist
   if [ ! -d "$GNUPGHOME" ]; then

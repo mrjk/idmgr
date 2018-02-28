@@ -374,13 +374,24 @@ idm_git_get_files_of_interest ()
 
   find_args="-maxdepth 2 -type f "
   {
+    # ssh
     find $HOME/.ssh/ $find_args -name "${id}*" 2>/dev/null
     find $HOME/.ssh/known_hosts.d/ $find_args -name "${id}*" 2>/dev/null
+
+    # Openstack
     find $HOME/.openstack/$id/ $find_args 2>/dev/null
-    find $GNUPGHOME/private-keys-v1.d/ $find_args 2>/dev/null
+
+    # GPG
+    find $GNUPGHOME $find_args 2>/dev/null
+
+    # Pass
     find $PASSWORD_STORE_DIR/ $find_args 2>/dev/null
+
+    # IDM
     find $IDM_DIR_ID/ $find_args -name "$id*" 2>/dev/null
     find $IDM_CONFIG_DIR/ $find_args -name "*$id*" 2>/dev/null
+
+    # Git
     echo "${git_id_config}"
   } | sed -E "s@$HOME/?@@g"
 
