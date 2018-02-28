@@ -33,7 +33,10 @@ idm_pass__ls ()
   local id=${1}
   lib_id_is_enabled $id || return 0
 
-  PASSWORD_STORE_DIR=~/.config/pass/${id} pass ls | sed 's/^/  /'
+  {
+    PASSWORD_STORE_DIR=~/.config/pass/${id} \
+      pass ls || true
+  } 2>/dev/null | sed 's/^/  /'
 }
 
 idm_pass__help ()

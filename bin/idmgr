@@ -99,7 +99,7 @@ idm_core__ls ()
   local id=${1}
   #set -x
 
-  idm_core_exec_mod $id __ls "\n%s ls" ${IDM_MOD_ORDER//:/ } 
+  idm_core_exec_mod $id __ls "%s ls" ${IDM_MOD_ORDER//:/ } 
 
 }
 
@@ -243,14 +243,26 @@ idm_core_exec_mod ()
       #set +x
 
       #lib_log INFO "Loading module $i ..."
-      [ "$sep" == "_" ] || lib_log NOTICE "$(printf "$sep" $i )"
+      #${val} $id  || \
+      #  {
+      #    # DO NOT DISABLE THIS BLOCK, that force plugin to load in anyway
+      #    true
+      #    lib_log WARN "Module $i failed in some way ... ($action)"
+      #  }
+
       export IDM_MOD_EXEC=chain
-      ${val} $id  || \
-        {
-          # DO NOT DISABLE THIS BLOCK, that force plugin to load in anyway
-          true
-          lib_log WARN "Module $i failed in some way ... ($action)"
-        }
+      local rc=0
+      out="$( ${val} $id || rc=$? )"
+
+      if [ "$rc" -eq 0 -a ! -z "$out" ]; then
+        [ "$sep" == "_" ] || 
+          lib_log NOTICE "$(printf "$sep" $i )"
+        echo -e "$out\n"
+      elif  [ "$rc" -ne 0 ]; then
+        lib_log WARN "Module $i failed in some way ... ($action)"
+        echo -e "$out\n"
+      fi
+
     else
       echo ""
       lib_log INFO "Skip module $i"

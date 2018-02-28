@@ -70,53 +70,66 @@ idm_tomb__ls ()
 {
   local id=$1
 
-  echo "  Tombs:"
-  find $IDM_CONFIG_DIR/enc/ -type f -name "*.tomb" | sed "s@$HOME@    ~@"
-
-
-  if lib_id_is_enabled $id; then
-    local tomb_status=
-    local tomb_date=
-    local git_status=
-    local git_date=
-
-    # Load local vars
-    idm_tomb_header $id
-
-    # Get status of tomb file
-    if [ -f "$git_tomb_enc" ]; then
-      tomb_status=present
-      tomb_date=$( lib_date_diff_human $(find $git_tomb_enc -printf "%Ts") )
-      tomb_date=", $tomb_date old"
-    else
-      tomb_status=absent
-    fi
-
-    # Get status of git repo
-    if [ -d "$git_tomb_dir" ]; then
-      git_status=open
-      #git_date=$( lib_date_diff_human $(find $git_tomb_dir -maxdepth 0 -printf "%Ts") )
-      #git_date=" $git_date"
-    else
-      git_status=closed
-    fi
-
-    # Display
-    echo "  Status:"
-    printf "    %-20s: %s\n" "encrypted tomb" "$tomb_status${tomb_date}"
-    printf "    %-20s: %s\n" "encrypted file" "$git_tomb_enc"
-    printf "    %-20s: %s\n" "tomb git status" "$git_status${git_date}"
-    printf "    %-20s: %s\n" "tomb git dir" "$git_tomb_dir"
-
-    # Show git remotes
-    if lib_git_is_repo id &>/dev/null ; then
-      echo "  Git remotes:"
-      lib_git id remote -v | sed 's/^/    /'
-      echo "  Last commits:"
-      lib_git id l --color=always | sed 's/^/    /'
-      echo
-    fi
+  # Show files if there are some
+  if [ -d "$IDM_CONFIG_DIR/enc/" ]; then
+    echo "  Tombs:"
+    find $IDM_CONFIG_DIR/enc/ -type f -name "*.tomb" | sed "s@$HOME@    ~@"
   fi
+
+  # Leave if not enabled
+  lib_id_is_enabled $id &&
+    return 0
+
+  # Status vars
+  local tomb_status=
+  local tomb_date=
+  local tomb_show=0
+  local git_status=
+  local git_date=
+  local git_show=0
+
+  # Load local vars
+  idm_tomb_header $id
+
+  # Get status of tomb file
+  if [ -f "$git_tomb_enc" ]; then
+    tomb_status=present
+    tomb_date=$( lib_date_diff_human $(find $git_tomb_enc -printf "%Ts") )
+    tomb_date=", $tomb_date old"
+    tomb_show=1
+  else
+    tomb_status=absent
+  fi
+
+  # Get status of git repo
+  if [ -d "$git_tomb_dir" ]; then
+    git_status=open
+    #git_date=$( lib_date_diff_human $(find $git_tomb_dir -maxdepth 0 -printf "%Ts") )
+    #git_date=" $git_date"
+  else
+    git_status="absent (closed)"
+  fi
+
+  # Leave if nothing to show
+  [ $(( $git_show + $tomb_show )) -eq 0 ] && return
+
+  # Display
+  echo "  Status:"
+  printf "    %-20s: %s\n" "encrypted tomb" "$tomb_status${tomb_date}"
+  printf "    %-20s: %s\n" "encrypted file" "$git_tomb_enc"
+  printf "    %-20s: %s\n" "tomb git status" "$git_status${git_date}"
+  printf "    %-20s: %s\n" "tomb git dir" "$git_tomb_dir"
+
+  # Check if local repo is enabled
+  lib_git_is_repo id &>/dev/null ||
+    return 0
+
+  # Show git remotes
+  echo "  Git remotes:"
+  lib_git id remote -v | sed 's/^/    /'
+  echo "  Last commits:"
+  lib_git id l --color=always | sed 's/^/    /'
+  echo
 
 
 }

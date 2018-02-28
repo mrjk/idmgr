@@ -66,7 +66,10 @@ idm_gpg__ls ()
   local id=${1}
   lib_id_is_enabled $id || return 0
 
-  gpg --list-keys | sed 's/^/  /' #| lib_log DUMP -
+  {
+    gpg --list-keys 2>/dev/null \
+      || true 
+  } | sed 's/^/  /'  #| lib_log DUMP -
 }
 
 idm_gpg__new ()

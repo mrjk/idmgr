@@ -22,11 +22,11 @@ idm_cloud__ls ()
   if lib_id_is_enabled $id; then
       if [ -f "${OS_CLOUD-}" ]; then
         echo "  enabled ($OS_CLOUD)"
-      else
-        echo "  disabled (config is absent ${OS_CLOUD:-${OS_CLOUD:+$OS_CLOUD}})"
+      #else
+      #  echo "  disabled (config is absent ${OS_CLOUD:-${OS_CLOUD:+$OS_CLOUD}})"
       fi
-  else
-    echo "  disabled"
+  #else
+  #  echo "  disabled"
   fi
 
 }

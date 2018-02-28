@@ -58,7 +58,7 @@ idm_ssh__ls ()
 
   lib_id_is_enabled $id || return 0
 
-  { ssh-add $opt || true ; } | sed 's/^/  /'
+  { ssh-add $opt || true ; } 2>/dev/null | sed 's/^/  /'
 }
 
 idm_ssh__disable ()
@@ -97,7 +97,8 @@ idm_ssh__enable ()
 }
 
 # LOGOUT
-idm_ssh__kill () {
+idm_ssh__kill () 
+{
 
   #set -x
 
@@ -178,26 +179,27 @@ idm_ssh__agent_start() {
 
 }
 
-idm_ssh__agent_clean () {
+idm_ssh__agent_clean () 
+{
   local id=$1
   local socket=$2
   local pid=${3:-0}
 
   # We should kill all agents ....
   if [ "${pid}" == '0' ]; then
-    set +x
+    #set +x
     pid=$(grep -a "$socket" /proc/*/cmdline \
       | grep -a -v 'thread-self' \
       | strings -s' ' -1 \
       | sed -E 's@ /proc/@ \n/proc/@g'
     )
-    set -x
+    #set -x
     pid="$( sed -E 's@/proc/([0-9]*)/.*@\1@' <<<"$pid" )"
   fi
-  set -x
+  #set -x
 
   # Remove process
-  if [ "$pid" != '0' ]; then
+  if [ "$pid" != '0' -a "$pid" -gt 0 ]; then
     kill $pid
   fi
 
