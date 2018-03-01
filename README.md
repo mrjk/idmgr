@@ -4,8 +4,8 @@
 There you go
 ```
 git clone
-dc idmgr
-eval "$( bin/idmgr shell)"
+cd idmgr
+eval "$( $PWD/bin/idmgr shell)"
 ```
 
 

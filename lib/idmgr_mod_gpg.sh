@@ -75,7 +75,7 @@ idm_gpg__ls ()
   lib_id_is_enabled $id || return 0
 
   {
-    gpg --list-keys 2>/dev/null \
+    gpg2 --list-keys 2>/dev/null \
       || true 
   } | sed 's/^/  /'  #| lib_log DUMP -
 }
@@ -91,7 +91,7 @@ idm_gpg__new ()
     }
 
   idm_gpg_cli_helper $id sub
-  gpg --edit-key $key addkey 
+  gpg2 --edit-key $key addkey 
 
   lib_log NOTICE "Your subkey $name is ready :)"
 }
@@ -142,7 +142,7 @@ idm_gpg__init ()
   )
 
   # Generate key
-  gpg --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
+  gpg2 --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
   #gpg --verbose --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
   #echo $?
   #gpg --gen-key
@@ -172,8 +172,8 @@ idm_gpg__del ()
   #lib_log WARN "Do you really want to destroy the '$key' key?"
   #idm_cli_timeout 1 || rc=$?
 
-  gpg --delete-key "$key" || true
-  gpg --delete-secret-key "$key" || true
+  gpg2 --delete-key "$key" || true
+  gpg2 --delete-secret-key "$key" || true
 
 }
 
@@ -309,7 +309,7 @@ lib_gpg_is_valid_recipients() {
 
 	# All the keys ID must be valid (the public keys must be present in the database)
 	for gpg_id in "${recipients[@]}"; do
-		gpg --list-keys "$gpg_id" &> /dev/null
+		gpg2 --list-keys "$gpg_id" &> /dev/null
 		if [[ $? != 0 ]]; then
 			lib_log ERR "${gpg_id} is not a valid key ID."
 			return 1
@@ -322,7 +322,7 @@ lib_gpg_is_valid_key() {
 	recipients=($@)
 	# At least one private key must be present
 	for gpg_id in "${recipients[@]}"; do
-		gpg --list-secret-keys "$gpg_id" &> /dev/null
+		gpg22 --list-secret-keys "$gpg_id" &> /dev/null
 		if [[ $? = 0 ]]; then
 			return 0
 		fi

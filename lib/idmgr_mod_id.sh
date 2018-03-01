@@ -40,7 +40,7 @@ idm_id__enable()
   [ -f "$conf" ] &&  source "$conf"
 
   echo "export SHELL_ID=${id}"
-  echo "export GIT_AUTHOR_NAME=${id}"
+  echo "export GIT_AUTHOR_NAME=${common_name:-$id}"
   echo "export GIT_AUTHOR_EMAIL=${email}"
 
   #  echo "export PATH=${XDG_OPT_HOME}/bin:$PATH"
