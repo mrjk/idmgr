@@ -13,6 +13,7 @@ idm_git_header ()
   idm_vars_git_id $id
 
   git_id_config=${IDM_CONFIG_DIR}/git/$id/local_gitconfig
+  git_id_perms=${IDM_CONFIG_DIR}/git/$id/local_perms
   git_id_dir=$git_dir
   git_id_work_tree=$git_work_tree
 
@@ -46,6 +47,8 @@ idm_git__help ()
   printf "  %-20s: %s\n" "git repo rm" "Delete remote"
   printf "  %-20s: %s\n" "git repo check" "Check remote availability"
   printf "  %-20s: %s\n" "git repo sync" "Sync with remotes"
+  printf "  %-20s: %s\n" "git perm_save" "Save current file permissions"
+  printf "  %-20s: %s\n" "git perm_restore" "Restore file permissions"
   echo  
   printf "  %-20s: %s\n" "git --help" "Git wrapper"
   printf "  %-20s: %s\n" "git [cmd]" "Git wrapper"
@@ -114,11 +117,17 @@ idm_git__init ()
 idm_git__repo()
 {
   local id=$1
-  local sub=$2
-  shift 2
-  local opts=${@-}
-  idm_git__repo_$sub $id $opts
+  local sub=${2:-ls}
+  local opts=
+
+  shift 2 &&
+    opts=${@-} ||
+      true
+
+  idm_git__repo_$sub $id ${opts}
 }
+
+idm_git__repo_help () { idm_git__help ${@-}; }
 
 idm_git__repo_ls()
 {
@@ -129,9 +138,9 @@ idm_git__repo_ls()
     return 1
   idm_git_header $id
   if [ -z "$name" ]; then
-    git config -f $git_id_config -l
+    git config -f $git_id_config -l | grep idmgr-sources || true
   else
-    git config -f $git_id_config --get idmgr-sources.$name
+    git config -f $git_id_config --get idmgr-sources.$name || true
     #git config -f $git_id_config --get-all idmgr-sources
   fi
 
@@ -169,6 +178,7 @@ idm_git__repo_check ()
   opts=${*-}
   local static_repos=
   local fqdn=
+  local clone_first=0
 
   # Loading
   lib_id_is_enabled $id ||
@@ -176,13 +186,20 @@ idm_git__repo_check ()
   idm_git_header $id
 
   # load infos
-  static_repos=$( git config -f $git_id_config -l | grep ^idmgr-sources)
-  fqdn=$( hostname -f )
+  static_repos=$( git config -f $git_id_config -l | grep ^idmgr-sources || true)
+  fqdn="$( hostname -f )"
+
+  # Check if local repo is present
+  if ! lib_git_is_repo id ; then
+    # Clone first one
+    clone_first=1
+  fi
 
   # Load static remotes
   while IFS== read -r name uri; do
 
     # Guess missing fields
+    [ ! -z "$uri" ] ||  continue
     if ! [[ "$uri" =~ @ ]]; then
       uri="${USER:-(id -n -u)}@$uri"
     fi
@@ -205,18 +222,27 @@ idm_git__repo_check ()
 
     # Test ssh conenction
     lib_log INFO "Testing: $name $user on $host in $path ..."
-    set -x
     ssh_script="$(idm_git_ssh_scan_script $id $path)"
     path=$(ssh -l $user $host "$ssh_script" < /dev/null || true )
+    uri="$user@$host:$path"
 
     # Act according result
     if [ ! -z "$path" ]; then
+
+      if [ "$clone_first" -eq 1 ]; then
+        # No repo yet
+        idm_git__init $id
+        clone_first=0
+      fi
+
+      # Local repo is a repo
       lib_git id config --add idmgr-online-sources.$name $uri
 
       if ! lib_git id remote get-url $name &>/dev/null; then
-        lib_git id remote add $name $user@$host:$path
+        lib_git id remote add $name "$uri"
       fi
       lib_log INFO "Remote $name is online"
+
       continue
     else
       lib_git id config --unset idmgr-online-sources.$name
@@ -230,6 +256,49 @@ idm_git__repo_check ()
     fi
       
   done <<<$static_repos
+
+}
+
+idm_git__install ()
+{
+  local id=$1
+  shift 1
+  opts=${*-}
+  local static_repos=
+  local fqdn=
+  local clone_first=0
+
+  # Loading
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+
+  # Check if repo has NO commits
+
+  set -x
+  # git co xpjez/master
+  stash_list="$(lib_git id ls-tree --name-only -r xpjez/master | xargs )"
+  local files=
+  #while IFS=$' ' read -r f ; do
+  for f in $stash_list; do
+    [ -f "$f" ] &&
+      files="${files+$files }$f"
+  done
+  #done <<<"$stash_list"
+
+  # Check status
+  if [ ! -z "$files" ]; then
+
+    # Add all files
+    lib_git id add $files
+    local commit_msg='Saving_existing_files'
+    lib_git id commit -m  $commit_msg
+
+  fi
+
+  # merge with master
+  lib_git id co xpjez/master
+  
 
 }
 
@@ -269,8 +338,11 @@ idm_git__repo_sync ()
     return 1
   idm_git_header $id
 
+  lib_git_is_repo id ||
+    return 1
+
   # Check repo presence ?
-  #idm_git__repo_check $id
+  # idm_git__repo_check $id
 
   # Sync
   for r in $( lib_git id remote | grep -v tomb ); do
@@ -337,9 +409,16 @@ idm_git__ls ()
   if lib_git_is_repo id &> /dev/null; then
     # Show files
     lib_git id ls-files | sort | sed 's/^/  /'
+    echo ""
   else
-    echo "  Repository is absent"
+    echo "  Status        : absent"
   fi
+
+  # Display repo infos
+  echo "  Work tree     : $git_id_work_tree"
+  echo "  Local config  : $git_id_config"
+  echo "  Git dir       : $git_id_dir"
+
 }
 
 idm_git__enable ()
@@ -362,6 +441,56 @@ idm_git__disable ()
 idm_git__kill () { idm_git__disable ${@-}; }
 
 
+idm_git__perm_save ()
+{
+  local id=$1
+  local files
+
+  # Loading
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+
+  # Check if it is a valid repo
+  lib_git_is_repo id ||
+    return 1
+  
+  # Show files
+  files=$(lib_git id ls-files | sort | xargs )
+  {
+    cd ~
+    find $files -exec stat -c '%a %n' {} \; > $git_id_perms
+  }
+
+  lib_log NOTICE "Permissions saved into $git_id_perms"
+}
+
+idm_git__perm_restore ()
+{
+  local id=$1
+  local files
+
+  # Loading
+  lib_id_is_enabled $id ||
+    return 1
+  idm_git_header $id
+
+  # Check if it is a valid repo
+  lib_git_is_repo id ||
+    return 1
+  
+  # Show files
+  {
+    cd ~
+    while read line; do 
+      chmod $line ||
+        true
+    done < $git_id_perms
+  }
+
+
+  lib_log NOTICE "Permissions restored from $git_id_perms"
+}
 
 ## Internal lib
 ##############################
@@ -369,8 +498,6 @@ idm_git__kill () { idm_git__disable ${@-}; }
 idm_git_get_files_of_interest ()
 {
   local id=${1}
-
-  git_id_config
 
   find_args="-maxdepth 2 -type f "
   {
@@ -392,8 +519,8 @@ idm_git_get_files_of_interest ()
     find $IDM_CONFIG_DIR/ $find_args -name "*$id*" 2>/dev/null
 
     # Git
-    echo "${git_id_config}"
-  } | sed -E "s@$HOME/?@@g"
+    find ${IDM_CONFIG_DIR}/git/$id/ $find_args 2>/dev/null
+  } | grep -v "enc/" | sed -E "s@$HOME/?@@g"
 
 }
 
