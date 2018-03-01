@@ -351,6 +351,9 @@ idm_git__repo_sync ()
     # If i well undertood, never do a push !
   done
 
+  # update local worktree
+  idm_git_pull_most_recent $id
+
 }
 
 
@@ -494,6 +497,26 @@ idm_git__perm_restore ()
 
 ## Internal lib
 ##############################
+
+idm_git_pull_most_recent ()
+{
+  local id=${1}
+
+  most_recent=$(lib_git git branch -a --sort=-committerdate | sed 's/..//' | head -n 1 )
+
+  # Check if we are fine
+  if [[ ! "$most_recent" =~ ^remote ]] ; then
+    lib_log NOTICE "Already up to date"
+    return 0
+  fi
+
+  # Apply changes to most recent branch
+  branch=$( sed -e 's@remotes/@@' -e 's@/@ @' )
+  lib_git git pull $branch ||
+    lib_log ERR "Could not update branch"
+
+  lib_log NOTICE "Repo updated"
+}
 
 idm_git_get_files_of_interest ()
 {
