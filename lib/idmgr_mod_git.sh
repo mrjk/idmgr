@@ -511,7 +511,7 @@ idm_git_pull_most_recent ()
   fi
 
   # Apply changes to most recent branch
-  branch=$( sed -e 's@remotes/@@' -e 's@/@ @' )
+  branch=$( sed -e 's@remotes/@@' -e 's@/@ @' <<< "$most_recent" )
   lib_git git pull $branch ||
     lib_log ERR "Could not update branch"
 
