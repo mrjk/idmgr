@@ -165,7 +165,7 @@ idm_ssh__agent_start() {
   # Ensure env file is not present
   [ ! -f "${run_dir}/env" ] || \
     rm -f "${run_dir}/env"
-    set -x
+    #set -x
 
   # Start the agent
   if ssh-agent -a "$run_dir/socket" -t $life -s | grep ^SSH_ > "$run_dir/env"; then
@@ -199,7 +199,7 @@ idm_ssh__agent_clean ()
   #set -x
 
   # Remove process
-  if [ "$pid" != '0' -a "$pid" -gt 0 ]; then
+  if [ ! -z "$pid" -a "$pid" -gt 0 ]; then
     kill $pid
   fi
 
@@ -263,7 +263,7 @@ idm_ssh_add ()
 # Useless at this stage i guess 
 idm_ssh__agent_check ()
 {
-  set -x
+  #set -x
   local id=$1
   local socket=${2:-_}
   local pid=${3:-0}
