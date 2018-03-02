@@ -226,11 +226,21 @@ idm_ssh_add ()
   lib_id_is_enabled $id
 
 
-  if [[ ! -z $key ]]; then
-      pub_keys=$(find ~/.ssh/id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort)
+  if [[ ! -z "$key" ]]; then
+      pub_keys=$(
+          {
+            # Compat mode
+            find ~/.ssh/id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
+
+            # New mode (test)
+            find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
+          } | sort | uniq
+        )
   else
-      pub_keys=$(find ~/.ssh/id -maxdepth $maxdepth -name "${id}_*" -name '*pub' | sort)
+      pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' | sort)
   fi
+
+  echo "$pub_keys"
 
   # Get list of key
   local key_list=""

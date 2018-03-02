@@ -6,6 +6,14 @@ IDM_MOD_DEPS="id gpg"
 ## Pass functions
 ##########################################
 
+idm_pass_header ()
+{
+  local id=$1
+
+  lib_require_bin pass || idm_exit 1
+}
+
+
 idm_pass ()
 {
   #set -x
@@ -21,6 +29,7 @@ idm_pass ()
   fi
 
   # Interncal override case
+  idm_pass_header $id
 
   # Fallback to command
   lib_id_is_enabled $id
@@ -32,6 +41,7 @@ idm_pass__ls ()
 {
   local id=${1}
   lib_id_is_enabled $id || return 0
+  idm_pass_header $id
 
   {
     PASSWORD_STORE_DIR=~/.config/pass/${id} \
