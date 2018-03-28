@@ -41,7 +41,7 @@ idm_ssh ()
   # Internal override case
   
   # Fallback to command
-  idm_ssh_help
+  idm_ssh__help
   return 1
 
 }
@@ -54,7 +54,6 @@ idm_ssh__ls ()
 {
   local id=$1
   local opt=${2:--l}
-  local opt=-l
 
   lib_id_is_enabled $id || return 0
 
@@ -222,7 +221,7 @@ idm_ssh_add ()
 {
   local id=$1
   local key=${2-}
-  local maxdepth=1
+  local maxdepth=2
 
   #lib_id_is_enabled $id
   lib_id_is_enabled $id
