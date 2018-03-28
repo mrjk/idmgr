@@ -67,7 +67,10 @@ idm_pass__enable ()
   local id=${1}
   ! lib_id_has_config $id
   
-  echo "export PASSWORD_STORE_DIR=~/.config/pass/${id}"
+  PASSWORD_STORE_DIR=~/.config/pass/${id}
+  [ -d "${PASSWORD_STORE_DIR}" ] || mkdir -p "${PASSWORD_STORE_DIR}"
+  
+  echo "export PASSWORD_STORE_DIR=$PASSWORD_STORE_DIR"
 }
 
 
