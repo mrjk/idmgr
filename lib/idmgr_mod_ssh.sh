@@ -199,8 +199,10 @@ idm_ssh__agent_clean ()
   #set -x
 
   # Remove process
-  if [ ! -z "$pid" -a "$pid" -gt 0 ]; then
-    kill $pid
+  if [ ! -z "$pid" ]; then
+   if [ "$pid" -gt 0 ]; then
+      kill $pid
+    fi
   fi
 
   # Remove socket
