@@ -12,6 +12,8 @@ idm_gpg__help ()
   printf "  %-20s: %s\n" "gpg init " "Create new identity"
   printf "  %-20s: %s\n" "gpg new " "Create new sub-identity"
   printf "  %-20s: %s\n" "gpg del" "Delete identity"
+  printf "  %-20s: %s\n" "gpg import" "Import keys (pub and priv)"
+  printf "  %-20s: %s\n" "gpg export" "Export key (pub and prov)"
   echo ""
 
 }
@@ -155,6 +157,40 @@ idm_gpg__init ()
 
   lib_log NOTICE "Your personal key $name is ready :)"
 }
+
+
+idm_gpg__export ()
+{
+  local id=${1}
+  local key=${2-}
+
+  lib_id_is_enabled $id || return 0
+
+  mkdir -p "$IDM_CONFIG_DIR/gpg"
+
+  # Export public and private key (secret)
+  gpg2 --export --armor $key > $IDM_CONFIG_DIR/gpg/${id}_pub.asc
+  gpg2 --export-secret-keys ${key:--a}  > $IDM_CONFIG_DIR/gpg/${id}_priv.asc
+  # And this --export-secret-subkeys ???
+
+  lib_log NOTICE "Keys '$IDM_CONFIG_DIR/gpg/${id}_priv.asc' has been exported"
+}
+
+idm_gpg__import ()
+{
+  local id=${1}
+  local key=${2:-$1}
+
+  if [ -f "$IDM_CONFIG_DIR/gpg/${id}_priv.asc" ]; then
+    gpg2 --import "$IDM_CONFIG_DIR/gpg/${id}_priv.asc" &&
+      lib_log NOTICE "Private key '$IDM_CONFIG_DIR/gpg/${id}_priv.asc' imported" ||
+      lib_log ERR "Could not import '$IDM_CONFIG_DIR/gpg/${id}_priv.asc' private key"
+  else
+    lib_log WARN "No key to import in '$IDM_CONFIG_DIR/gpg/${id}_priv.asc'"
+  fi
+
+}
+
 
 
 idm_gpg__del ()
