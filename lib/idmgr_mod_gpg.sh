@@ -14,8 +14,60 @@ idm_gpg__help ()
   printf "  %-20s: %s\n" "gpg del" "Delete identity"
   printf "  %-20s: %s\n" "gpg import" "Import keys (pub and priv)"
   printf "  %-20s: %s\n" "gpg export" "Export key (pub and prov)"
+  printf "  %-20s: %s\n" "gpg share" "Show your public key in text format"
+  printf "  %-20s: %s\n" "gpg cheat" "Show a little cheat sheet"
   echo ""
 
+}
+
+idm_gpg__cheat ()
+{
+  cat << EOF
+  Binaries:
+    gpg: Server and embedded usage
+    gpg2: Desktop and user usage
+    Note: You can use both of them seamlessly
+  Acronims:
+    sec: Private key
+    ssb: Private subkey
+    pub: Public key
+    sub: Public subkey
+    fpr: Fingerprint
+    grp: Keygrip
+    uid: Persona identification string
+  Usage:
+    S: Signing
+    C: Certification
+    E: Encryption
+    A: Authentication
+  Certification level:
+    0: No verification at all (always trusted)
+    1: Publicy know persona
+    2: IRL persona verification (trusted)
+    3: IRL strong persona verification (trusted)
+  Links:
+    Comprehensive GPG2 manual: https://www.mankier.com/1/gpg2
+    Simple quickstart: https://github.com/rezen/gpg-notes
+
+EOF
+
+# Notes:
+# See uses cases: http://www.saminiir.com/establish-cryptographic-identity-using-gnupg/
+# Pass helper: https://github.com/avinson/gpg-helper
+
+# Other scripts:
+# https://github.com/baird/GPG/blob/master/GPGen/gpgen
+# Best practices for encryption: https://github.com/SixArm/gpg-encrypt
+# Signing party: https://github.com/rameshshihora/gpg/blob/master/keysigning_party.sh
+# Parcimnoie secure refresh: https://github.com/EtiennePerot/parcimonie.sh
+# A security library lib https://github.com/Whonix/gpg-bash-lib
+# Shared secret mgmt: https://github.com/netantho/gpgsharedpass
+# gpgp use cases notes: https://github.com/rezen/gpg-notes
+# ansible role: https://github.com/juju4/ansible-gpgkey_generate
+
+# Bunch of scripts: https://github.com/eferdman/gpg-helper-scripts/tree/master/gpg
+# Nifty key mgmt script: https://github.com/andsens/gpg-primer/blob/master/generate-master.sh
+# Nifty scripts: https://github.com/gregorynicholas/gpg-kitty
 }
 
 ## Required functions
@@ -23,6 +75,8 @@ idm_gpg__help ()
 
 idm_gpg__enable ()
 {
+  # See: https://github.com/rameshshihora/gpg/blob/master/bashrc
+
   local id=${1}
   lib_id_has_config $id
 
@@ -174,6 +228,28 @@ idm_gpg__export ()
   # And this --export-secret-subkeys ???
 
   lib_log NOTICE "Keys '$IDM_CONFIG_DIR/gpg/${id}_priv.asc' has been exported"
+}
+
+idm_gpg__share ()
+{
+  local id=${1}
+  local key=${2-}
+
+  lib_id_is_enabled $id || return 0
+
+  # Export public 
+  gpg2 --export --armor $key
+}
+
+idm_gpg__gen_revoke ()
+{
+  local id=${1}
+  local key=${2-}
+
+  lib_id_is_enabled $id || return 0
+
+  # Show revocation certificate
+  gpg2 --gen-revoke $key
 }
 
 idm_gpg__import ()
