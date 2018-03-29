@@ -33,7 +33,7 @@ idm_cloud__ls ()
 
 idm_cloud__help ()
 {
-  echo "S"
+  echo "Cloud management"
   printf "  %-20s: %s\n" "clouds enable" "Enable prompt"
   printf "  %-20s: %s\n" "clouds disable" "Disable prompt"
 }

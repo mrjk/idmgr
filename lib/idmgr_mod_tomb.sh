@@ -56,7 +56,7 @@ idm_tomb__help ()
   printf "    %-20s: %s\n" "tomb push <remote>|all" "Save the current configuration into the tomb"
   printf "    %-20s: %s\n" "tomb leave" "Remove all traces of your passage"
 
-  if lib_id_is_enabled $id; then
+  if lib_id_is_enabled $id 2>/dev/null ; then
     idm_tomb_header $id
     echo "  config:"
     printf "    %-20s: %s\n" "git_tomb_enc" "$git_tomb_enc"

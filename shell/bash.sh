@@ -168,3 +168,7 @@ _pass()
 }
 
 complete -o filenames -F _pass pass
+
+# Show current identities
+echo "INFO: idmgr has been loaded, use 'idmgr' or 'i' to call it"
+#$IDM_BIN id ls
