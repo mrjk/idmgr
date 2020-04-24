@@ -1,7 +1,9 @@
 #!/bin/bash
 
-IDM_MOD_DEPS="id"
+IDM_MOD_GIT_DEPS="s1 id ssh"
 IDM_DISABLE_AUTO+=" git__enable git__disable git__kill "
+
+#idm_hook_register enable idm_git__enable 5
 
 
 ## Environments

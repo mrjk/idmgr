@@ -1,7 +1,6 @@
 #!/bin/bash
 
-
-IDM_MOD_DEPS="id gpg"
+IDM_MOD_SSH_DEPS="s0 id gpg"
 
 # trap 'idm_ssh_kill' 0
 

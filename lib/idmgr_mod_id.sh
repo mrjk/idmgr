@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_DEPS=""
+IDM_MOD_ID_DEPS="s0"
 
 ## Identity functions
 ##########################################

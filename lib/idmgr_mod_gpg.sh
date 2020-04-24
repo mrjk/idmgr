@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_DEPS="id"
+IDM_MOD_GPG_DEPS="s0 id"
 
 
 idm_gpg__help ()

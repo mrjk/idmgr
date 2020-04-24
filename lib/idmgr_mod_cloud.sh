@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_DEPS="id pass gpg ssh"
+IDM_MOD_CLOUD_DEPS="s3"
 
 ## Prompt functions
 ##########################################

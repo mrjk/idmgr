@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_DEPS="id pass gpg ssh"
+IDM_MOD_PS1_DEPS="s4 id pass gpg ssh"
 IDM_DISABLE_AUTO+="ps1__ls"
 
 ## Prompt functions
@@ -13,7 +13,7 @@ idm_ps1 ()
   local action=${1-}
   shift || true
 
-  idm_ps1_ls
+  idm_ps1__ls
 }
 
 idm_ps1__ls ()

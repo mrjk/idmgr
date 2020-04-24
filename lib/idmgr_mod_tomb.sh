@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_DEPS="id gpg git"
+IDM_MOD_TOMB_DEPS="s3 id gpg git"
 IDM_MOD_TAGS="id tool"
 IDM_MOD_PROG="safe yadm"
 IDM_MOD_PREF="core id"

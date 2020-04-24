@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_DEPS="id gpg"
+IDM_MOD_PASS_DEPS="s2"
 
 
 ## Pass functions
