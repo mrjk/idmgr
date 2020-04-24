@@ -1,7 +1,7 @@
 #!/bin/bash
 
-IDM_MOD_PS1_DEPS="s4 id pass gpg ssh"
-IDM_DISABLE_AUTO+="ps1__ls"
+#IDM_MOD_PS1_DEPS="s4 id pass gpg ssh"
+#IDM_DISABLE_AUTO+="ps1__ls"
 
 ## Prompt functions
 ##########################################
@@ -20,10 +20,8 @@ idm_ps1__ls ()
 {
   local id=${1}
 
-  #set -x 
-  #echo "PS1=${SHELL_PS1:-${PS1-}}"
-
-  if grep -q "($id)" <<<"${SHELL_PS1:-${PS1-}}" ; then
+  # Bug here: PS1 and vars are like nk existing ... weird
+  if grep -q "($id)" <<<"${IDM_SHELL_PS1:-${PS1-}}" ; then
     echo "  enabled"
   else
     echo "  disabled"

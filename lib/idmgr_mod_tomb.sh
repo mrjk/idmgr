@@ -1,12 +1,12 @@
 #!/bin/bash
 
-IDM_MOD_TOMB_DEPS="s3 id gpg git"
-IDM_MOD_TAGS="id tool"
-IDM_MOD_PROG="safe yadm"
-IDM_MOD_PREF="core id"
-
-IDM_DISABLE_AUTO+=" tomb__enable tomb__disable tomb__kill "
-
+#IDM_MOD_TOMB_DEPS="s3 id gpg git"
+#IDM_MOD_TAGS="id tool"
+#IDM_MOD_PROG="safe yadm"
+#IDM_MOD_PREF="core id"
+#
+#IDM_DISABLE_AUTO+=" tomb__enable tomb__disable tomb__kill "
+#
 
 
 ## Environments

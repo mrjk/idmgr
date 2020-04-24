@@ -35,6 +35,8 @@ IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
+IDM_SRC_WORDS='enable disable kill shell quit e d k s q'
+
 mkdir -p $IDM_CONFIG_DIR $IDM_DIR_ID $IDM_DIR_CACHE
 
 # Mod vars ...
@@ -71,9 +73,12 @@ idm_core__help ()
   printf "  %-20s: %s\n" "shred [id|user|dev|ask]" "Safely schred data (definitive)"
   printf "  %-20s: %s\n" "fun " "Show internal function (debug)"
   printf "  %-20s: %s\n" "hier " "Show cli function (debug)"
-
+ 
+  local mods=$(idm_lib_order_get status)
+  echo
+  echo "Loaded mods: $mods"  
   
-  idm_core_exec_mod $id __help "\n%s" $(idm_lib_order_get status)
+  idm_core_exec_mod $id __help "\n%s" $mods
 
   echo
   lib_log NOTICE "License:"
@@ -105,8 +110,11 @@ idm_core__enable ()
   if [ "${SHELL_ID-}" == "$id" ]; then
     #idm_exit 0 INFO "Your workspace is already activated"
     lib_log WARN "Your workspace is already activated"
+    
   elif [ -n "${SHELL_ID-}" ]; then
-    idm_exit 0 WARN "Your workspace is already activated with $SHELL_ID"
+    #idm_exit 0 WARN "Your workspace is already activated with $SHELL_ID"
+    lib_log WARN "Changing $SHELL_ID workspace to $id" 
+    idmgr disable "${SHELL_ID-}"
   fi
 
   # Retrieve environment config
@@ -132,7 +140,7 @@ idm_core__disable ()
   idm_core_exec_mod $id __disable "Disabling %s ..." $(idm_lib_order_get disable)
 
   # Inform user
-  lib_log NOTICE "Id $id is disabled"
+  lib_log NOTICE "Identity '$id' is unloaded"
 }
 
 idm_core__kill ()
@@ -155,8 +163,10 @@ idm_core__kill ()
 ##########################################
 
 # Dump sub commands that need to be sourved to work
-idm_core__shell_words ()
+idm_core__shell_words_deprected ()
 {
+  # REPLACED BY IDM_SRC_WORDS, does not peovides ids anymore ...
+  exit 777
   local id=${1-}
   local words=
 
@@ -170,7 +180,6 @@ idm_core__shell_words ()
 
 idm_core__shell ()
 {
-  IDM_SRC_WORDS=$( $IDM_DIR_ROOT/bin/idmgr shell_words )
 
   echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
   echo "export IDM_DIR_ROOT='$IDM_DIR_ROOT'"
@@ -257,8 +266,8 @@ idm_lib_order_get ()
   local f=${1}
  # >&2 echo "fmt: ${IDM_LIB_TABLEFMT%%$f*}"
   #>&2 echo -e "\n>order: $f\n>table: $IDM_LIB_TABLE"
-  
-  f=$( wc -w <<< "ignore ${IDM_LIB_TABLEFMT%%$f*}" )
+  local w="ignore ${IDM_LIB_TABLEFMT%%$f*}"
+  f=$( wc -w <<< "$w" )
   
   sort -t, -k${f} <<< "$IDM_LIB_TABLE" | cut -d, -f1 | xargs
 }
@@ -285,27 +294,9 @@ idm_lib_load ()
   local var_name 
   [ -n "$names" ] || names=$(idm_lib_names $type)
   var_name="IDM_${type^^}_LOADED"  
-
-  
-  # Rebuild vars for all modules !
-  case $type in 
-    lib)  
-    
-    ;;
-    mod)
-      local d_val d_var
-      
-    ;;
-       
-    *)
-      echo "unsupported type: $type"
-      return 1
-    ;;
-  esac
   
   
   # Source lib/mods
-  #set -x
   for name in $names; do
     source "$IDM_DIR_LIB/idmgr_${type}_${name}.sh"
     if [ "$?" -eq 0 ] ; then    
@@ -359,6 +350,7 @@ idm_mod_files ()
 
 idm_mod_order ()
 {
+   >&2 echo "DEPRECATED: idm_mod_order"
     local mods=$@
     export IDM_MOD_FILES="$( xargs <<< $mods)"
 
@@ -420,10 +412,11 @@ idm_core_init ()
 
   # Force native library orders
   idm_lib_order_set id 10 90 10
-  idm_lib_order_set gpg 11 89 11
+  #idm_lib_order_set gpg 11 89 11
   idm_lib_order_set ssh 12 88 12
+  #idm_lib_order_set git 50 50 50
   idm_lib_order_set ps1 60 40 60
-  idm_lib_order_set tomb 50 50 50
+  #idm_lib_order_set tomb 50 50 50
 
   # Load external lib
   idm_lib_load lib
@@ -749,6 +742,9 @@ idm_core_cli ()
 ##########################################
 
 idm_core_cli $@
+
+
+#declare -p | grep " IDM"
 
 exit
 

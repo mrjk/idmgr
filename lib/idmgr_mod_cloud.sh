@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_CLOUD_DEPS="s3"
+#IDM_MOD_CLOUD_DEPS="s3"
 
 ## Prompt functions
 ##########################################

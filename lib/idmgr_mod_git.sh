@@ -1,7 +1,7 @@
 #!/bin/bash
 
-IDM_MOD_GIT_DEPS="s1 id ssh"
-IDM_DISABLE_AUTO+=" git__enable git__disable git__kill "
+#IDM_MOD_GIT_DEPS="s1 id ssh"
+#IDM_DISABLE_AUTO+=" git__enable git__disable git__kill "
 
 #idm_hook_register enable idm_git__enable 5
 
@@ -420,10 +420,11 @@ idm_git__ls ()
   fi
 
   # Display repo infos
+  {
   echo "  Work tree     : $git_id_work_tree"
   echo "  Local config  : $git_id_config"
   echo "  Git dir       : $git_id_dir"
-
+  } | sed "s:$HOME:~:g"
 }
 
 idm_git__enable ()

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_ID_DEPS="s0"
+#IDM_MOD_ID_DEPS="s0"
 
 ## Identity functions
 ##########################################
@@ -32,7 +32,7 @@ idm_id__disable()
 
 idm_id__kill () { idm_id__disable ${@-}; }
 
-idm_id__enable()
+idm_id__enable ()
 {
   local id=${1}
   local conf="$IDM_DIR_ID/$id.env"

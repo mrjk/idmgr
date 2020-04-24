@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IDM_MOD_SSH_DEPS="s0 id gpg"
+#IDM_MOD_SSH_DEPS="s0 id gpg"
 
 # trap 'idm_ssh_kill' 0
 
@@ -12,7 +12,8 @@ idm_ssh__help ()
   echo "Secure Shell"
 #  printf "  %-20s: %s\n" "info" "Info submenu"
   printf "  %-20s: %s\n" "ssh ls" "List unlocked keys"
-  printf "  %-20s: %s\n" "ssh new" "Create new ssh key (ssh-keygen)"
+  printf "  %-20s: %s\n" "ssh tree" "Show keypairs tree"
+  printf "  %-20s: %s\n" "ssh new [dir]" "Create new ssh key dest dir"
   printf "  %-20s: %s\n" "ssh add" "Unlock known keypairs"
   printf "  %-20s: %s\n" "ssh rm" "Lock known keypairs"
   printf "  %-20s: %s\n" "ssh del" "Delete keypair"
@@ -130,6 +131,129 @@ idm_ssh__kill ()
 }
 
 
+## Extra functions
+##########################################
+
+idm_ssh__tree ()
+{
+  local id=$1
+  if lib_id_has_config $id &>/dev/null; then
+    tree -C "$HOME/.ssh/$id"
+  else
+    tree -C "$HOME/.ssh/"
+  fi
+}
+
+idm_ssh__new ()
+{
+  local id=${1-}
+  local dest=${2-}
+  
+  local default=
+  local key_vers=
+  local key_user=
+  local key_host=  
+  local key_sizes=
+  local key_vers="$(date +'%Y%m%d')"
+  
+  #set -x
+
+  # Guess defaults
+  default=$(id -un)
+  if lib_id_has_config $id &>/dev/null; then
+    default=$id
+    if [ -z "$dest" ]; then
+      dest="$HOME/.ssh/$default"
+    fi
+  else
+    dest=${dest:-.}
+  fi
+  mkdir -p "$dest"
+  echo "INFO: Key destination dir: $dest"
+  
+  # Login
+  while ! grep -q '\w\+' <<< "$key_user"; do 
+    read -rp "> Username [$default]: " ans
+    key_user="${ans:-$default}"
+  done 
+  
+  
+  # Host name
+  default="$(hostname -f)"
+  while ! grep -q '[a-zA-Z0-9.-]\+' <<< "$key_host"; do 
+    read -rp "> Hostname [$default]: " ans
+    #echo ""
+    key_host="${ans:-$default}"
+  done 
+  
+    
+  # Keys sizes
+  default="ns"
+  echo "Please choose key types:"
+  echo "n) ed25519   strongest, fast"
+  echo "s) rsa4096   most compatible, slow"
+  echo "o) rsa2048   old compatility"
+  while ! grep -q '[nso]\+' <<< "$key_sizes"; do
+    echo -n "> Key types [$default]: "
+    read -n 3 -r  ans
+    echo ""
+    key_sizes="${ans:-$default}"
+  done 
+  
+  # Ask password
+  echo "Define key passphrase for the key(s)."
+  echo "Leave it empty for no password (not recommemded)."
+  echo -n "> Key passphrase [none]: "
+  read -rs key_pass
+  echo
+  key_pass="${key_pass:-}"
+  
+  ans=""
+  while [ "$ans" != "$key_pass" ]; do 
+    echo -n "> Confirm passphrase: "
+    read -rs ans
+    echo  
+  done 
+  
+  
+  # Create keys
+  local size=$key_sizes
+  while [ -n "$size" ]; do
+    local k=${size:0:1}
+    echo -e "\n> Generating key ..."
+    set +e
+    case $k in
+      n)
+        ssh-keygen -f "$dest/${key_user}_ed25519_${key_vers}" \
+          -t ed25519 -a 100 \
+          -N "$key_pass" \
+          -C "${key_user}@${key_host}:ed25519_${key_vers}"
+      ;;
+      s)  
+        ssh-keygen -f "$dest/${key_user}_rsa4096_${key_vers}" \
+        -t rsa -b 4096 -o -a 500 \
+        -N "$key_pass" \
+        -C "${key_user}@${key_host}:rsa4096_${key_vers}"
+      ;;
+      o)
+        ssh-keygen -f "$dest/${key_user}_rsa2048_${key_vers}" \
+        -t rsa -b 2048 -o -a 100 \
+           -N "$key_pass" \
+        -C "${key_user}@${key_host}:rsa2048_${key_vers}"
+      ;;
+    esac
+    set -e
+    
+    
+    size=${size:1}
+  done
+  
+ echo
+ echo "INFO: Key(s) has been created in $dest"
+
+}
+
+
 ## Agent functions
 ##########################################
 
@@ -216,7 +340,7 @@ idm_ssh__agent_clean ()
 ## Extended functions
 ##########################################
 
-idm_ssh_add ()
+idm_ssh__add ()
 {
   local id=$1
   local key=${2-}
@@ -230,7 +354,7 @@ idm_ssh_add ()
       pub_keys=$(
           {
             # Compat mode
-            find ~/.ssh/id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
+            #find ~/.ssh/id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
 
             # New mode (test)
             find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
@@ -240,7 +364,7 @@ idm_ssh_add ()
       pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' | sort)
   fi
 
-  echo "$pub_keys"
+  #echo "$pub_keys"
 
   # Get list of key
   local key_list=""
@@ -260,10 +384,10 @@ idm_ssh_add ()
     idm_exit 0 WARN "No keys found"
 
   lib_log INFO "Adding keys:"
-  xargs -n 1 <<<$key_list | lib_log DUMP -
+  xargs -n 1 <<<$key_list | sed "s:$HOME:~:" | lib_log DUMP -
 
   echo ""
-  ssh-add $key_list
+  ssh-add $key_list 
 
 }
 
