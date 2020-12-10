@@ -10,8 +10,8 @@
 idm_ssh__help ()
 {
   echo "Secure Shell"
-#  printf "  %-20s: %s\n" "info" "Info submenu"
   printf "  %-20s: %s\n" "ssh ls" "List unlocked keys"
+  printf "  %-20s: %s\n" "ssh pub" "Show public keys"
   printf "  %-20s: %s\n" "ssh tree" "Show keypairs tree"
   printf "  %-20s: %s\n" "ssh new [dir]" "Create new ssh key dest dir"
   printf "  %-20s: %s\n" "ssh add" "Unlock known keypairs"
@@ -21,6 +21,21 @@ idm_ssh__help ()
   printf "  %-20s: %s\n" "ssh enable" "Enable agent"
   printf "  %-20s: %s\n" "ssh disable" "Disable agent"
   printf "  %-20s: %s\n" "ssh kill" "Kill agent"
+
+  cat <<EOF
+
+Documentation:
+
+You can create a new ssh key with the assistant:
+  i ssh new
+The you can add this key to your agent, it will ask you your key password:
+  i ssh add
+If you want to kill the agent:
+  i ssh rm
+If you want to delete your key files, simply run:
+  i ssh rm
+
+EOF
   
 }
 
@@ -56,7 +71,6 @@ idm_ssh__ls ()
   local opt=${2:--l}
 
   lib_id_is_enabled $id || return 0
-
   { ssh-add $opt || true ; } 2>/dev/null | sed 's/^/  /'
 }
 
@@ -144,6 +158,17 @@ idm_ssh__tree ()
   fi
 }
 
+idm_ssh__pub ()
+{
+  local id=$1
+  local path="$HOME/.ssh"
+  if lib_id_has_config $id &>/dev/null; then
+    path="$HOME/.ssh/$id"
+  fi
+
+  head -n 3 "$path"/*.pub
+}
+
 idm_ssh__new ()
 {
   local id=${1-}
@@ -161,9 +186,9 @@ idm_ssh__new ()
   # Guess defaults
   default=$(id -un)
   if lib_id_has_config $id &>/dev/null; then
-    default=$id
+    default=${login:-$id}
     if [ -z "$dest" ]; then
-      dest="$HOME/.ssh/$default"
+      dest="$HOME/.ssh/$id"
     fi
   else
     dest=${dest:-.}
@@ -179,7 +204,7 @@ idm_ssh__new ()
   
   
   # Host name
-  default="$(hostname -f)"
+  default="${hostname:-$(hostname -f)}"
   while ! grep -q '[a-zA-Z0-9.-]\+' <<< "$key_host"; do 
     read -rp "> Hostname [$default]: " ans
     #echo ""
@@ -349,7 +374,6 @@ idm_ssh__add ()
   #lib_id_is_enabled $id
   lib_id_is_enabled $id
 
-
   if [[ ! -z "$key" ]]; then
       pub_keys=$(
           {
@@ -358,10 +382,12 @@ idm_ssh__add ()
 
             # New mode (test)
             find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
+            #find ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort
           } | sort | uniq
         )
   else
-      pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' | sort)
+      #pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' | sort)
+      pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort)
   fi
 
   #echo "$pub_keys"

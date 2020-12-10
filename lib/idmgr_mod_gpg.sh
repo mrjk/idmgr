@@ -454,7 +454,7 @@ lib_gpg_decrypt_dir ()
   # Check required bin
   lib_require_bin tar || idm_exit 1
   lib_require_bin gpg2 || idm_exit 1
-  export GPG=${GPG2:-$GPG}
+  export GPG=${GPG2:-$GPG_BIN}
 
   tar_opts=" -C ${dst%/*} -zx "
   if [ ! -z "$key" ]; then
@@ -463,7 +463,7 @@ lib_gpg_decrypt_dir ()
     gpg_opts+="-d"
   fi
 
-  $GPG $gpg_opts $src | $TAR $tar_opts || \
+  $GPG_BIN $gpg_opts $src | $TAR_BIN $tar_opts || \
     idm_exit 1 ERR "Could not decrypt file: $src into $dst"
 
 }
@@ -479,7 +479,7 @@ lib_gpg_encrypt_dir ()
   # Check required bin
   lib_require_bin tar || idm_exit 1
   lib_require_bin gpg2 || idm_exit 1
-  export GPG=${GPG2:-$GPG}
+  export GPG=${GPG2:-$GPG_BIN}
 
   #GPG_KEY="$(yadm config yadm.gpg-recipient || true )"
   #GPG_KEY="${GPG_DEFAULT_ID-}"
@@ -537,8 +537,8 @@ lib_gpg_encrypt_dir ()
   #set -x
 
   # Encrypt all the stuffs
-  $TAR -C "${src%/*}" -cz "${src##*/}" 2>/dev/null | \
-    $GPG -a $gpg_opts --yes -o $dst || \
+  $TAR_BIN -C "${src%/*}" -cz "${src##*/}" 2>/dev/null | \
+    $GPG_BIN -a $gpg_opts --yes -o $dst || \
       idm_exit 1 ERR "Could not encrypt directory: $src"
 
   #set +x
@@ -546,7 +546,7 @@ lib_gpg_encrypt_dir ()
   # File descritor tests ...
   #exec 3<> /tmp/foo
   #>&3 echo "$pass"
-  #{ echo "$pass\n" >&3 ; $TAR -C "$(dirname $src)" -cz "$src" 2>/dev/null; } | \
+  #{ echo "$pass\n" >&3 ; $TAR_BIN -C "$(dirname $src)" -cz "$src" 2>/dev/null; } | \
   #exec 3>&- #close fd 3.
 
 }

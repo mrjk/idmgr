@@ -39,9 +39,9 @@ idm_id__enable ()
 
   [ -f "$conf" ] &&  source "$conf"
 
-  echo "export SHELL_ID=${id}"
-  echo "export GIT_AUTHOR_NAME=${common_name:-$id}"
-  echo "export GIT_AUTHOR_EMAIL=${email}"
+  echo "export SHELL_ID='${id}'"
+  echo "export GIT_AUTHOR_NAME='${common_name:-$id}'"
+  echo "export GIT_AUTHOR_EMAIL='${email}'"
 
   #  echo "export PATH=${XDG_OPT_HOME}/bin:$PATH"
   #  echo "export SSH_CONFIG=${id}"
@@ -183,14 +183,18 @@ idm_id__dump ()
 idm_id_template ()
 {
   local cn=${1-}
+  local hostname=${2-}
   local tz lang
 
   # Auto guess
   tz=$( timedatectl  | grep "Time zone" | awk '{print $3}' || true )
 
   echo "common_name=${cn}"
+  echo "login=${cn}"
   echo "email="
   echo "tz=$tz"
+  echo "public=false"
+  echo "hostname=${hostname:-$(hostname -f)}"
 
 }
 idm_id__rm ()
