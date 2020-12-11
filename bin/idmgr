@@ -30,18 +30,18 @@ IDM_SCRIPT_NAME=idmgr
 IDM_BIN=${IDM_BIN:-$0}
 IDM_DIR_ROOT=${IDM_DIR_ROOT:-$( realpath "$(dirname $(realpath $0))/../" )}
 
-IDM_CONFIG_DIR=${IDM_CONFIG_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
-IDM_DIR_ID=${IDM_DIR_ID:-$IDM_CONFIG_DIR/id}
+IDM_ID_ENV_DIR=${IDM_ID_ENV_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
+IDM_DIR_ID=${IDM_DIR_ID:-$IDM_ID_ENV_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
 IDM_SRC_WORDS='enable disable kill shell quit e d k s q'
 
-mkdir -p $IDM_CONFIG_DIR $IDM_DIR_ID $IDM_DIR_CACHE
+mkdir -p $IDM_ID_ENV_DIR $IDM_DIR_ID $IDM_DIR_CACHE
 
 # Mod vars ...
 IDM_DISABLE_AUTO=
-
+IDM_ID_ENV=
 
 
 
@@ -97,32 +97,22 @@ idm_core__ls ()
 idm_core__enable ()
 {
   local id=${1:-${SHELL_ID-}}
-  local conf
-
-  #set -x
 
   # Local checks
-  #lib_id_is_valid_syntax $id || idm_exit 1 ERR "You must provide an id"
   lib_id_has_config $id || idm_exit 1 ERR "Configuration '$id' does not exists"
 
   # Check if workspace is enabled
-  #idm_validate is_enabled $id 
   if [ "${SHELL_ID-}" == "$id" ]; then
-    #idm_exit 0 INFO "Your workspace is already activated"
     lib_log WARN "Your workspace is already activated"
-    
   elif [ -n "${SHELL_ID-}" ]; then
-    #idm_exit 0 WARN "Your workspace is already activated with $SHELL_ID"
     lib_log WARN "Changing $SHELL_ID workspace to $id" 
     idmgr disable "${SHELL_ID-}"
   fi
 
-  # Retrieve environment config
-  conf="$IDM_DIR_ID/$id.env"
-
   # Notice user
   {
-    . $conf
+    # Reload user config
+    . "$IDM_ID_ENV"
     idm_core_exec_mod $id __enable "Enabling %s ..." $(idm_lib_order_get enable)
   } # | lib_log DUMP -
 
@@ -134,12 +124,7 @@ idm_core__disable ()
 {
   local id=${1}
   lib_id_is_enabled $id
-
-  # Reverse module unloading
-  #IDM_MOD_ORDER="$( lib_reverse_doted_list $IDM_MOD_ORDER )" 
   idm_core_exec_mod $id __disable "Disabling %s ..." $(idm_lib_order_get disable)
-
-  # Inform user
   lib_log NOTICE "Identity '$id' is unloaded"
 }
 
@@ -147,14 +132,8 @@ idm_core__kill ()
 {
   local id=${1}
   lib_id_is_enabled $id
-
-  # Reverse module killing
-  #IDM_MOD_ORDER="$( lib_reverse_doted_list $IDM_MOD_ORDER )" 
   idm_core_exec_mod $id __disable "Killing %s ..." $(idm_lib_order_get disable)
-
-  # Inform user
   lib_log NOTICE "Id $id has been safely killed"
-
 }
 
 
@@ -162,28 +141,12 @@ idm_core__kill ()
 ## Shell integration CLI commands
 ##########################################
 
-# Dump sub commands that need to be sourved to work
-idm_core__shell_words_deprected ()
-{
-  # REPLACED BY IDM_SRC_WORDS, does not peovides ids anymore ...
-  exit 777
-  local id=${1-}
-  local words=
-
-  # When we are asking to output source words
-  words="enable disable kill shell quit q $(lib_id_get_all_id | xargs)"
-
-  echo ":${words// /:}:"
-
-}
-
-
 idm_core__shell ()
 {
 
   echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
   echo "export IDM_DIR_ROOT='$IDM_DIR_ROOT'"
-  echo "IDM_SRC_WORDS='$IDM_SRC_WORDS'"
+  echo "IDM_SRC_WORDS='$IDM_SRC_WORDS $(lib_id_get_all_id | xargs)'"
 
   tail -n +2  $IDM_DIR_ROOT/shell/bash.sh
 }
@@ -220,103 +183,6 @@ idm_core__hier ()
     | sed -e 's/__/   /' -e 's/()//'
 }
 
-
-## Mods internal libs
-##########################################
-
-# Required libs: None
-
-
-idm_lib_names ()
-{
-  local type=$1
-  
-  find "$IDM_DIR_LIB" \
-    -name "idmgr_${type}_*.sh" \
-    -printf '%f\n' | 
-    sed -E "s@idmgr_${type}_([^\.]*).*@\\1@" |
-    xargs
-}
-
-
-IDM_LIB_TABLE=
-IDM_LIB_TABLEFMT="mod enable disable status"
-
-idm_lib_order_set ()
-{
-  local id args rec
-  id=$1
-  shift 1
-  args=$@
-  
-  # Does not allow modifications
-  ! grep -q "^$id," <<< "$IDM_LIB_TABLE" || return
-  
-  rec="$id,${args// /,}"
-  IDM_LIB_TABLE=$(
-    grep -v "^$id," <<< "$IDM_LIB_TABLE"; 
-    echo "$rec"
-  )
-}
-
-
-idm_lib_order_get ()
-{
-  #set +x
-  local f=${1}
- # >&2 echo "fmt: ${IDM_LIB_TABLEFMT%%$f*}"
-  #>&2 echo -e "\n>order: $f\n>table: $IDM_LIB_TABLE"
-  local w="ignore ${IDM_LIB_TABLEFMT%%$f*}"
-  f=$( wc -w <<< "$w" )
-  
-  sort -t, -k${f} <<< "$IDM_LIB_TABLE" | cut -d, -f1 | xargs
-}
-
-
-# This is the library wrapper. Any loading
-# must use this function. Create environment vars.
-# Input: [type] [wordlist of mods]
-# Output: none
-# Usage:
-# idm_lib_load # Load all default libs
-# idm_lib_load lib # Same
-# idm_lib_load mod # Load all mods
-# idm_lib_load mod mod1 mod2 # loads specific mods
-
-
-idm_lib_load ()
-{
-  local type=${1:-lib}
-  shift 1 
-  local names=${@-}
-  
-  # Create variables
-  local var_name 
-  [ -n "$names" ] || names=$(idm_lib_names $type)
-  var_name="IDM_${type^^}_LOADED"  
-  
-  
-  # Source lib/mods
-  for name in $names; do
-    source "$IDM_DIR_LIB/idmgr_${type}_${name}.sh"
-    if [ "$?" -eq 0 ] ; then    
-      
-      # Add mod/lib to the loaded list
-      declare -g $var_name="${!var_name-}:$name"
-      
-      # Load the infile mod order
-      if [ "$type" == 'mod' ]; then
-        local p_var="IDM_${type^^}_${name^^}_PRIO"
-        local p_val="${!p_var-}"
-        [ -z "$p_val" ] || idm_lib_order_set $name ${p_val}
-      fi
-    else
-      echo  "  WARN: Error while loading $type: ${name:-NONE}"
-    fi
-    
-  done
- # set +x
-}
 
 
 
@@ -400,43 +266,6 @@ idm_mod_list ()
 # idm_mod
 
 
-# Main initialisation settings
-idm_core_init ()
-{
-  #set -x
-  export EDITOR=${EDITOR:-vim}
-  
-  # Create directories
-  mkdir -p $IDM_CONFIG_DIR $IDM_DIR_ID
-
-
-  # Force native library orders
-  idm_lib_order_set id 10 90 10
-  #idm_lib_order_set gpg 11 89 11
-  idm_lib_order_set ssh 12 88 12
-  #idm_lib_order_set git 50 50 50
-  idm_lib_order_set ps1 60 40 60
-  #idm_lib_order_set tomb 50 50 50
-
-  # Load external lib
-  idm_lib_load lib
-  idm_lib_load mod
-
-  trap "idm_exit_trap" INT TERM EXIT
-  
-  return
-  
-  # delrecated ???
-#  IDM_MOD_FILES=$(idm_mod_files)
- # IDM_MOD_ORDER=$(idm_mod_list)
-#  export IDM_TIMEOUT_USER=5
-
-  # Load modules
-#  for i in $IDM_MOD_FILES ; do
-#    source $i
- # done
-
-}
 
 
 # Return the list of required mods to run. High level
@@ -448,14 +277,10 @@ idm_core_mods ()
 }
 
 
-
-
-
-
 # This function is the module execution engine.
 # id: The current id to use
-# action: The current command to run, ie enable
-# sep: '_' Or a text to be diaplayed for the user
+# action: The current command to run, ie `enable`
+# sep: '_' Or a text to be displayed for the user
 # mods: mod[,mod,...] list of mods to be triggered
 idm_core_exec_mod ()
 {
@@ -470,18 +295,8 @@ idm_core_exec_mod ()
 
     if  [ "$( type -t $val )" = function ]; then
 
-      #set -x
       # Skip if disabled ...
       [[ ":${IDM_DISABLE_AUTO// /:}" =~ :${i}${action}: ]] && continue
-      #set +x
-
-      #lib_log INFO "Loading module $i ..."
-      #${val} $id  || \
-      #  {
-      #    # DO NOT DISABLE THIS BLOCK, that force plugin to load in anyway
-      #    true
-      #    lib_log WARN "Module $i failed in some way ... ($action)"
-      #  }
 
       export IDM_MOD_EXEC=chain
       local rc=0
@@ -520,12 +335,8 @@ idm_core_exec_mod ()
 
 idm_exit ()
 {
-  #set +x
   local rc=${1:-0}
   local msg lvl
-  #[ -p /dev/stdin ] \
-  #  && dump="$(</dev/stdin)" \
-  #  || dump=""
   
   # Check exit status
   if [ "$#" -eq 3 ]; then
@@ -545,11 +356,8 @@ idm_exit ()
     lib_log $lvl "$msg"
   fi
 
-  # Remove trap to avoid to be called for normal
-  # exit.
+  # Remove trap to avoid to be called for normal and exit for good
   trap "" INT TERM EXIT
-
-  # Exit for good
   exit $rc
 }
 
@@ -570,64 +378,148 @@ idm_exit_trap () {
 }
 
 
-## User interface
+## Compat
 ##########################################
 
 # This function display a user skippable timeout.
 idm_cli_timeout ()
 {
-  local default_rc=${1:-1}
-  local wait_time=${2:-$IDM_TIMEOUT_USER}
-  local start=$(date '+%s')
-  local human_word go_word
-
-  # Humanise ...
-  [ "$default_rc" -ge 0 ] || default_rc=1
-  if [ "$default_rc" -eq 0 ]; then
-    human_word="abort"
-    go_word=Q
-  elif [ "$default_rc" -ne 0 ]; then
-    human_word="continue"
-    go_word=Y
-  fi
-
-  # Notifying user
-  local human_date="$(date -d@$wait_time -u '+%Hh%Mm%Ss' | sed 's/00.//g' )"
-  local human_msg="Type '$go_word' to $human_word ($human_date):"
-
-  # Wait user input or timeout ...
-  local answer=
-  local rc=0
-  read -t $wait_time -p "   ASK: ${human_msg} "  answer || rc=$?
-  local remaining=$(( $wait_time - ( $(date '+%s') - $start ) ))
-
-  # Make a decision
-  if [[ "$rc" -eq 142 ]]; then
-    # We timeout, so GO! (142 is the timeout return code)
-    echo
-    return $default_rc
-  elif [[ "$answer" == "$go_word" ]]; then
-    # User asked to GO!
-    return 0
-  elif [[ $remaining -le 0 ]]; then
-    # Whatever, time passed, so GO!
-    return $default_rc
-  elif [[ "$rc" -ne 0 ]]; then
-    # Hmm, something wrong, we quit with error...
-    urm_log ERROR "Something went wrong (return code=$rc)"
-    return 1
-  fi
-
-  # We loop back
-  idm_cli_timeout $default_rc $remaining 
+  lib_log WARN "Deprecated use of idm_cli_timeout ..."
+  lib_cli_timeout $@
 }
+
+
+
+## Mods internal libs
+##########################################
+
+# Required libs: None
+
+
+idm_lib_names ()
+{
+  local type=$1
+  
+  find "$IDM_DIR_LIB" \
+    -name "idmgr_${type}_*.sh" \
+    -printf '%f\n' | 
+    sed -E "s@idmgr_${type}_([^\.]*).*@\\1@" |
+    xargs
+}
+
+
+
+
+idm_lib_order_set ()
+{
+  local id args rec
+  id=$1
+  shift 1
+  args=$@
+  
+  # Does not allow modifications
+  ! grep -q "^$id," <<< "$IDM_LIB_TABLE" || return
+  
+  rec="$id,${args// /,}"
+  IDM_LIB_TABLE=$(
+    grep -v "^$id," <<< "$IDM_LIB_TABLE"; 
+    echo "$rec"
+  )
+}
+
+
+idm_lib_order_get ()
+{
+  #set +x
+  local f=${1}
+ # >&2 echo "fmt: ${IDM_LIB_TABLEFMT%%$f*}"
+  #>&2 echo -e "\n>order: $f\n>table: $IDM_LIB_TABLE"
+  local w="ignore ${IDM_LIB_TABLEFMT%%$f*}"
+  f=$( wc -w <<< "$w" )
+  
+  sort -t, -k${f} <<< "$IDM_LIB_TABLE" | cut -d, -f1 | xargs
+}
+
+
+# This is the library wrapper. Any loading
+# must use this function. Create environment vars.
+# Input: [type] [wordlist of mods]
+# Output: none
+# Usage:
+# idm_lib_load # Load all default libs
+# idm_lib_load lib # Same
+# idm_lib_load mod # Load all mods
+# idm_lib_load mod mod1 mod2 # loads specific mods
+
+
+idm_lib_load ()
+{
+  local type=${1:-lib}
+  shift 1 
+  local names=${@-}
+  
+  # Create variables
+  local var_name 
+  [ -n "$names" ] || names=$(idm_lib_names $type)
+  var_name="IDM_${type^^}_LOADED"  
+  
+  
+  # Source lib/mods
+  for name in $names; do
+    source "$IDM_DIR_LIB/idmgr_${type}_${name}.sh"
+    if [ "$?" -eq 0 ] ; then    
+      
+      # Add mod/lib to the loaded list
+      declare -g $var_name="${!var_name-}:$name"
+      
+      # Load the infile mod order
+      if [ "$type" == 'mod' ]; then
+        local p_var="IDM_${type^^}_${name^^}_PRIO"
+        local p_val="${!p_var-}"
+        [ -z "$p_val" ] || idm_lib_order_set $name ${p_val}
+      fi
+    else
+      echo  "  WARN: Error while loading $type: ${name:-NONE}"
+    fi
+    
+  done
+ # set +x
+}
+
+
 
 
 ## Entry points
 ##########################################
 
-# Cli format
-#  
+# Main initialisation settings
+idm_core_init ()
+{
+  export EDITOR=${EDITOR:-vim}
+  mkdir -p $IDM_ID_ENV_DIR $IDM_DIR_ID
+
+  # Configure libraries
+  IDM_LIB_TABLE=
+  IDM_LIB_TABLEFMT="mod enable disable status"
+
+  # Force native library disaply order
+  idm_lib_order_set id 10 90 10
+  idm_lib_order_set ssh 12 88 12
+  idm_lib_order_set ps1 60 40 60
+  idm_lib_order_set alias 60 40 60
+
+  #idm_lib_order_set gpg 11 89 11
+  #idm_lib_order_set git 50 50 50
+  #idm_lib_order_set tomb 50 50 50
+
+  # Load external lib
+  idm_lib_load lib
+  idm_lib_load mod
+
+  trap "idm_exit_trap" INT TERM EXIT
+
+}
+
 
 idm_core_cli () 
 {
@@ -639,17 +531,8 @@ idm_core_cli ()
   local opt=
   local shell_id=${SHELL_ID:-_}
 
-
   idm_core_init
   
-  #set -x
-  #echo "$IDM_LIB_TABLE="
-  #idm_lib_order_get enable
- # idm_lib_order_get disable
-  #idm_lib_order_get status
-  #return 1
-  #set +x
-
   # Three way parsing
   local dep_order="$(idm_lib_order_get enable)"
   if [ "$#" -eq 0 ]; then
@@ -714,10 +597,19 @@ idm_core_cli ()
 
   # Aliases
   case $action in
+    --help|-h)
+      action=help
+      ;;
     quit|q)
       action=disable
       ;;
   esac
+
+  # Retrieve environment config
+  local IDM_ID_ENV="$IDM_DIR_ID/$id.env"
+  if [[ -f "$IDM_ID_ENV" ]]; then
+    . "$IDM_ID_ENV"
+  fi
 
   # Dispatch
   #lib_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
@@ -742,287 +634,4 @@ idm_core_cli ()
 ##########################################
 
 idm_core_cli $@
-
-
-#declare -p | grep " IDM"
-
-exit
-
-idm_lib_src ()
-{
-  local type=${1}
-  local name=${2}
-  shift 2
-  local keys=${@-}
-  
-  local src prefix
-  
-  prefix="IDM_${TYPE^^}_"
-  
-  # Source the library
-  source "$src"
-  
-  # Import global vars
-  for i in $keys ; do
-    :
-  done
-  
-}
-
-
-
-
-# Retrieve a global var from src
-idm_lib_src_get_key ()
-{
-  local type=${1}
-  local name=${2}
-  local key=${3}
-  
-  local src="$IDM_DIR_LIB/idmgr_${type}_${name}.sh"
-  local var="IDM_MOD_${key^^}"
-  
-  local r=$(sed -e "/^$var=/!d;s/$var=/" "$src")
-  echo "${r//[^a-z0-9 ]}"
-}
-
-
-
-
-
-
-
-
-# Deprecated ?
-____idm_mod_load2 ()
-{
-  local lib_name=${1}
-  local lib_args=${@-}
-  local env_var=IDM_LIB_${lib_name^^}
-#set -x
-  #lib_log DEBUG "$env_var=${!env_var}"
-  [ -z "${!env_var-}" ] ||  return 0
-
-  cmd="$(command -v $lib_name || true )"
-
-  if [ -x "${cmd:-_}" ]; then
-
-    . "$cmd" $lib_args 
-    declare -g $env_var=$cmd
-    lib_log INFO "Loaded lib: $env_var=${!env_var}"
-    #set -x
-
-  else
-    idm_exit 1 "Could not find 'safe' executable in \$PATH (missing module dependency)"
-  fi
-}
-
-# deprecated
-___idm_lib_load_all2 ()
-{
-  #for lib in $( find $IDM_DIR_LIB -name 'idm_lib_*.sh'); do
-  while read -r lib; do
-    #. $lib || lib_log WARN "Error while loading lib $lib :/"
-    . ${lib:-/dev/null} || echo  "  WARN: Error while loading lib: ${lib:-NONE}"
-  done <<< "$( find $IDM_DIR_LIB -name 'idm_lib_*.sh')"
-}
-
-
-
-# Takes a list of files to scan for deps. This
-# will tell idmgr in which order to load its deps
-# Input: wordlist of paths
-# Return: wordlist
-# Usage:
-# idm_mod_order mod1 mod2 modN
-
-_____idm_lib_deps ()
-{
-
-  local type=${1:-lib}
-  local key=${2:-}
-  shift 2 || shift 1
-  local names=${2-}
-  
-  local var_name="IDM_${type^^}_ORDER"  
-  [ -n "$names" ] || names=$(idm_lib_names $type)
-  
-  # Source libraries
-  local src
-  for name in $names; do
-    src="$IDM_DIR_LIB/idmgr_${type}_${name}.sh" || echo  "  WARN: Error while loading lib: ${name:-NONE}"
-    declare -g $var_name="${!var_name-}:$name"
-  done
-
-
-  return
-
-    local mods=$@
-    export IDM_MOD_FILES="$( xargs <<< $mods)"
-
-    # Generate dependency order
-    #result=$(
-      for f in $IDM_MOD_FILES; do
-        mod_name=${f##*mod_}
-        mod_name=${mod_name%\.sh}
-
-        # A bit hackish ...
-        IDM_MOD_DEPS=$( grep '^IDM_MOD_DEPS=' $f )
-        IDM_MOD_DEPS=${IDM_MOD_DEPS##*=}
-        IDM_MOD_DEPS=${IDM_MOD_DEPS//[^a-z0-9 ]}
-        IDM_MOD_DEPS="$( tr ' ' '\n' <<<${IDM_MOD_DEPS} )"
-
-        # Output
-        echo -e "$( xargs -n1 -I{} echo {} "$mod_name" <<<"$IDM_MOD_DEPS" )"
-      done | tsort | grep -v 'core' | xargs
-    #)
-
-    #lib_log DEBUG "Dependencies order: $result"
-    #echo $result
-}
-
-
-
-
-## Data, tests
-
-# DEPRECATRED, replaced by lib_id
-# Should be replaced by idm_validate ?
-# Is a wrapper for enduser !!!
-# idm_is_enabled ()
-# {
-#   lib_log DEPRECATED "call: idm_is enabled $@, use lib_id_is_enabled ${1-} instead"
-#   lib_trace
-#   local id=${1}
-#   idm_validate is_enabled $id 
-#   {
-#     lib_log WARN "You need to activate an id first"
-#     return 1
-#   }
-# }
-
-
-#  # DEPRECATRED, replaced by lib_id
-#  idm_get ()
-#  {
-#    lib_log DEPRECATED "call: idm_get $@, use lib_id_has_config instead"
-#    lib_trace
-#    local item=$1
-#    local value=${2-}
-#  
-#    case $item in
-#      all_id)
-#      # idm_get all_id 
-#      # => lib_id_get_all_id
-#        for id in $( find $IDM_DIR_ID -type f -name '*.env' 2>/dev/null ); do
-#          id=${id%%\.env}
-#          echo "${id##*/}"
-#        done 
-#      ;;
-#  
-#      all_id_files)
-#      # => lib_id_get_all_file
-#        ls $IDM_DIR_ID/*.env || true
-#      ;;
-#  
-#      id_config)
-#      # => lib_id_get_config
-#        if [ -f "$IDM_DIR_ID/$value.env" ]; then
-#          echo "id=$value"
-#          cat $IDM_DIR_ID/$value.env
-#        else
-#          return 1
-#        fi
-#      ;;
-#  
-#      *)
-#        lib_log ERR "Cannot get item '$item'"
-#      ;;
-#    esac
-#  }
-
-#  # DEPRECATRED, replaced by lib_id
-#  idm_validate ()
-#  {
-#    #lib_log DEPRECATED "call: idm_validate $@, sed with: lib_id_has_config or equivalent"
-#    local type=$1
-#    local value=${2-}
-#  
-#    case $type in
-#      id_filter|id)
-#      lib_log DEPRECATED "call: idm_validate id_filter $@, sed with: lib_id_is_valid_syntax \$id"
-#        [ "$value" != '_' ] && \
-#          [[ "$value" =~ ^[a-zA-Z0-9_-]+$ ]] && return $?
-#      ;;
-#      id_config)
-#        lib_log DEPRECATED "call: idm_validate id_config $@, sed with: lib_id_has_config \$id"
-#        if [[ -f "$IDM_DIR_ID/$value.env" ]]; then
-#          return 0
-#        fi
-#      ;;
-#      is_enabled)
-#        lib_log DEPRECATED "call: idm_validate is_enabled $@, sed with: lib_id_is_enabled \$id"
-#        if [[ -z "${value-}" && "${value-}" != '_' ]]; then
-#          if [ -z "${SHELL_ID-}" ] ; then
-#            return 1
-#          else
-#            return 0
-#          fi
-#        else
-#          if [ "${value-}" == "${SHELL_ID-}" ]; then
-#            return 0
-#          else
-#            return 1
-#          fi
-#        fi
-#      ;;
-#      is_disabled)
-#        lib_log DEPRECATED "call: idm_validate is_disabled $@, sed with: ! lib_id_is_enabled \$id"
-#        [ -z "${SHELL_ID-}" ] && return $?
-#      ;;
-#        
-#      *)
-#        lib_log ERR "Cannot validate type '$type'"
-#      ;;
-#    esac
-#  
-#    return 1
-#  }
-
-
-
-
-
-
-
-# OLD PIEECES OF CODE
-
-
-    # echo "export MANPAGER=less"
-    # #echo "export VIMINIT=let \$MYVIMRC='$XDG_CONFIG_HOME/vim/vimrc' \| source \$MYVIMRC"
-    # #echo "export VIMINIT='let \$MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"'"
-
-    # # Misc
-    # echo "export PYENV_ROOT=${XDG_OPT_HOME}/pyenv"
-    # echo "export PYTHONUSERBASE=${XDG_OPT_HOME}/python"
-    # echo "export PYTHONZ_ROOT=${XDG_OPT_HOME}/pythonz"
-    # echo "export PIPSI_BIN_DIR=${XDG_OPT_HOME}/python-venv/bin"
-
-    # echo "export LUA_CPATH=${XDG_OPT_HOME}/lua/?.so"
-    # echo "export LUA_PATH=${XDG_OPT_HOME}/lua/?.lua"
-    # echo "export LUAROCKS_CONFIG=~/.config/lua-${id}/luarocks.lua"
-
-    # echo "export GEM_HOME=${XDG_OPT_HOME}/ruby"
-    # echo "export GEMRC=~/.config/ruby-${id}/gemrc"
-    # echo "export GEM_SPEC_CACHE=${XDG_OPT_HOME}/ruby/gem/specs"
-
-    # echo "export COMPOSER_CACHE_DIR=${XDG_OPT_HOME}/composer"
-    # echo "export COMPOSER_HOME=${XDG_OPT_HOME}/composer"
-
-    # echo "export NPM_CONFIG_USERCONFIG=~/.config/npmrc"
-    # echo "export VAGRANT_HOME=${XDG_OPT_HOME}/vagrant"
-    # echo "export GOPATH=${XDG_OPT_HOME}/go"
-
-
-
 

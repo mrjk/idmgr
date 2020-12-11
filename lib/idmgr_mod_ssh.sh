@@ -369,44 +369,13 @@ idm_ssh__add ()
 {
   local id=$1
   local key=${2-}
-  local maxdepth=2
 
   #lib_id_is_enabled $id
   lib_id_is_enabled $id
 
-  if [[ ! -z "$key" ]]; then
-      pub_keys=$(
-          {
-            # Compat mode
-            #find ~/.ssh/id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
+  key_list=$(idm_ssh_search_private_keys "$id" "$key")
 
-            # New mode (test)
-            find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$1*" | sort
-            #find ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort
-          } | sort | uniq
-        )
-  else
-      #pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' | sort)
-      pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort)
-  fi
-
-  #echo "$pub_keys"
-
-  # Get list of key
-  local key_list=""
-  while read -r pub_key; do
-      #if [[ -f "$(sed 's/\.pub$/.key/' <<< "${pub_key}" )" ]]; then
-      if [[ -f "${pub_key//\.pub/.key}" ]]; then
-          key_list="$key_list ${pub_key//\.pub/.key}"
-      else
-          #if [[ -f "$(sed 's/\.pub$//' <<< "${pub_key}" )" ]]; then
-          if [[ -f "${pub_key%\.pub}" ]]; then
-              key_list="$key_list ${pub_key%\.pub}"
-          fi
-      fi
-  done <<< "$pub_keys"
-
-  [ -n "$pub_keys" ] || \
+  [ -n "$key_list" ] || \
     idm_exit 0 WARN "No keys found"
 
   lib_log INFO "Adding keys:"
@@ -415,6 +384,47 @@ idm_ssh__add ()
   echo ""
   ssh-add $key_list 
 
+}
+
+
+## SSH Library
+##########################################
+
+# This function search the bests ssh key file to use matching to an ID
+idm_ssh_search_private_keys ()
+{
+  local id=$1
+  local key=${2-}
+  local maxdepth=2
+
+  if [[ ! -z "$key" ]]; then
+      pub_keys=$(
+          {
+            # Compat mode
+            find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$id*" | sort
+          } | sort | uniq
+        )
+  else
+      pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort)
+  fi
+
+  # Get list of key
+  local key_list=""
+  while read -r pub_key; do
+      if [[ -z "$pub_key" ]]; then
+        continue
+      elif [[ -f "${pub_key//\.pub/.key}" ]]; then
+          key_list="${key_list:+$key_list\n}${pub_key//\.pub/.key}"
+      else
+          if [[ -f "${pub_key%\.pub}" ]]; then
+              key_list="${key_list:+$key_list\n}${pub_key%\.pub}"
+          else
+              lib_log WARN "Can't find private key of: $pub_key"
+          fi
+      fi
+  done <<< "$pub_keys"
+
+  echo -e "$key_list"
 }
 
 ## Deprecated functions
