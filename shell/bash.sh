@@ -7,18 +7,19 @@ IDM_BIN=${IDM_BIN:-idmgr}
 i ()
 {
 
-  if grep -q ":${1:-NONE}:" <<<"${IDM_SRC_WORDS}"; then
+  if grep -q " ${1:-NONE} " <<<" ${IDM_SRC_WORDS} "; then
 
     result="$( $IDM_BIN $@)"
   
     # Debug module
     if [ "${ID_DEBUG-}" == "true" ]; then
+      echo "DEBUG: Command: $IDM_BIN $@"
       if [ "${result:-NONE}" == "NONE" ]; then
-        echo "======= ${result:-NONE}"
+        echo "DEBUG: ======= ${result:-NONE}"
       else
-        echo ======= Shell has sourced =======
+        echo "DEBUG: ======= Shell has sourced ======="
         echo "${result:-NONE}"
-        echo =======
+        echo "DEBUG: ======="
       fi
     fi
 
