@@ -106,7 +106,7 @@ idm_core__enable ()
     lib_log WARN "Your workspace is already activated"
   elif [ -n "${SHELL_ID-}" ]; then
     lib_log WARN "Changing $SHELL_ID workspace to $id" 
-    idmgr disable "${SHELL_ID-}"
+    $IDM_BIN disable "${SHELL_ID-}"
   fi
 
   # Notice user
