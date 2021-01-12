@@ -33,9 +33,24 @@ i ()
 }
 
 
+i_restore_last_id ()
+{
+  local IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
+  local state_file=$IDM_DIR_CACHE/last_id
+  if [ -f "$state_file" ]; then
+    local id=$(cat "$state_file")
+    if ! [ -z "${id//_/}" ]; then
+      >&2 echo "INFO: Auto enabling last id: $id"
+      i enable $id
+    fi
+  fi
+
+}
+
+
 # Disable when pressing C-b in shell :)
 bind -x '"\C-b": i disable'
-
+i_restore_last_id
 
 
 

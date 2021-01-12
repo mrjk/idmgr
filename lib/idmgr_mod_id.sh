@@ -28,6 +28,7 @@ idm_id__disable()
 {
   # Disable internal variables
   echo "unset SHELL_ID GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL" | lib_log CODE -
+  idm_id_save_last_id _
 }
 
 idm_id__kill () { idm_id__disable ${@-}; }
@@ -42,6 +43,8 @@ idm_id__enable ()
   echo "export SHELL_ID='${id}'"
   echo "export GIT_AUTHOR_NAME='${common_name:-$id}'"
   echo "export GIT_AUTHOR_EMAIL='${email}'"
+
+  idm_id_save_last_id $id
 
   #  echo "export PATH=${XDG_OPT_HOME}/bin:$PATH"
   #  echo "export SSH_CONFIG=${id}"
@@ -180,23 +183,6 @@ idm_id__dump ()
   done
 }
 
-idm_id_template ()
-{
-  local cn=${1-}
-  local hostname=${2-}
-  local tz lang
-
-  # Auto guess
-  tz=$( timedatectl  | grep "Time zone" | awk '{print $3}' || true )
-
-  echo "common_name=${cn}"
-  echo "login=${cn}"
-  echo "email="
-  echo "tz=$tz"
-  echo "public=false"
-  echo "hostname=${hostname:-$(hostname -f)}"
-
-}
 idm_id__rm ()
 {
   local id=${1}
@@ -213,4 +199,28 @@ idm_id__rm ()
   else
     lib_log WARN "File '$IDM_DIR_ID/$id.env' was already deleted"
   fi
+}
+
+idm_id_save_last_id ()
+{
+  local id=${1}
+  echo "$id" > "$IDM_DIR_CACHE/last_id"
+}
+
+idm_id_template ()
+{
+  local cn=${1-}
+  local hostname=${2-}
+  local tz lang
+
+  # Auto guess
+  tz=$( timedatectl  | grep "Time zone" | awk '{print $3}' || true )
+
+  echo "common_name=${cn}"
+  echo "login=${cn}"
+  echo "email="
+  echo "tz=$tz"
+  echo "public=false"
+  echo "hostname=${hostname:-$(hostname -f)}"
+
 }
