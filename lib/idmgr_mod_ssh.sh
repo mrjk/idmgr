@@ -401,11 +401,11 @@ idm_ssh_search_private_keys ()
       pub_keys=$(
           {
             # Compat mode
-            find ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$id*" | sort
+            find -L ~/.ssh/$id -maxdepth $maxdepth -name "${id}_*" -name '*pub' -name "*$id*" | sort
           } | sort | uniq
         )
   else
-      pub_keys=$(find ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort)
+      pub_keys=$(find -L ~/.ssh/$id -maxdepth $maxdepth -name '*pub' | sort)
   fi
 
   # Get list of key
