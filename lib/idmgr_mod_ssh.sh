@@ -4,6 +4,8 @@
 
 # trap 'idm_ssh_kill' 0
 
+# See: https://github.com/kalbasit/ssh-agents
+
 ## SSH functions
 ##########################################
 
@@ -89,31 +91,40 @@ idm_ssh__enable ()
 {
   local id=$1
   lib_id_has_config $id
+  local socket="${XDG_RUNTIME_DIR}/ssh-agent/${id}/socket"
 
   # Source environment
-  if [ -f "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" ] ; then
-    . "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" 
-  else 
-    unset SSH_AUTH_SOCK SSH_AGENT_PID
-  fi
+  # if [ -f "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" ] ; then
+  #   . "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" 
+  # else 
+  #   unset SSH_AUTH_SOCK SSH_AGENT_PID
+  # fi
+  unset SSH_AUTH_SOCK SSH_AGENT_PID
+
+
 
   # Check status
-  if ! idm_ssh__is_agent_working $id ${SSH_AUTH_SOCK:-_} ${SSH_AGENT_PID:-0}; then
-    if ! idm_ssh__agent_start $id; then
-        lib_log WARN "Could not start ssh agent :("
-        return 1
+  export SSH_AUTH_SOCK=$socket
+  if ! idm_ssh__is_agent_working $socket ; then
+    if [[ "${IDM_NO_BG:-false}" == true ]] || [[ -n "${DIRENV_IN_ENVRC-}" ]] ; then
+      lib_log WARN "Start of background process disabled because of: IDM_NO_BG=${IDM_NO_BG:-false}"
+      lib_log TIPS "Run '${0##*/} $id' to start ssh-agent"
+    else
+      idm_ssh__agent_start $id
     fi
   fi
 
   # Display config to load
-  cat "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env"
+  # >&2 ls -ahl ${XDG_RUNTIME_DIR}/ssh-agent/${id}/
+  # cat "${XDG_RUNTIME_DIR}/ssh-agent/${id}/env" || true
+
+  echo "export SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
 }
 
 # LOGOUT
 idm_ssh__kill () 
 {
 
-  #set -x
 
   local id=$1
   local run_dir="${XDG_RUNTIME_DIR}/ssh-agent/${id}"
@@ -140,7 +151,6 @@ idm_ssh__kill ()
   # Disable agent
   idm_ssh__disable $id
 
-  set +x
 
 }
 
@@ -181,7 +191,6 @@ idm_ssh__new ()
   local key_sizes=
   local key_vers="$(date +'%Y%m%d')"
   
-  #set -x
 
   # Guess defaults
   default=$(id -un)
@@ -284,45 +293,118 @@ idm_ssh__new ()
 
 idm_ssh__is_agent_working ()
 {
-  local id=$1
-  local socket=${2:-_}
-  local pid=${3:-0}
+  local socket=$1
   local rc=
 
   set +e
-  SSH_AUTH_SOCK=$socket SSH_AGENT_PID=$pid ssh-add -l &>/dev/null
+  SSH_AUTH_SOCK=$socket ssh-add -l &>/dev/null
   rc=$?
   set -e
 
-  [ "$rc" -lt 2 ] && return 0
-}
-
-idm_ssh__agent_start() {
-  local id=$1
-  local life=5d
-  local run_dir="${XDG_RUNTIME_DIR}/ssh-agent/${id}"
-
-  # Check if we can recover from previous instance
-  idm_ssh__agent_clean $id "$run_dir/socket" 0 || true
-
-  # Ensure directory are present
-  [ -d "$run_dir" ] || \
-    mkdir -p "$run_dir"
-
-  # Ensure env file is not present
-  [ ! -f "${run_dir}/env" ] || \
-    rm -f "${run_dir}/env"
-    #set -x
-
-  # Start the agent
-  if ssh-agent -a "$run_dir/socket" -t $life -s | grep ^SSH_ > "$run_dir/env"; then
-
-    echo "$run_dir/env"
-    lib_log INFO "Start ssh-agent ..."
-  else
-    lib_log WARN "Could not start ssh agent :("
+  if ! [ "$rc" -lt 2 ]; then
+    [[ -e "$socket" ]] && rm "$socket"
     return 1
   fi
+  return 0
+}
+
+background() {
+  >&2 echo "MY COMMAND: $@"
+  set +e
+  exec 0>&- || true
+  exec 1>&- || true
+  exec 2>&- || true
+  exec 3>&- || true
+  "$@" &
+  local pid=$!
+  disown $pid
+  echo $pid
+  set -e
+}
+
+
+idm_ssh__agent_start() {
+  # local socket=$1
+  local id=$1
+  local life=5d
+
+  local socket_dir="${XDG_RUNTIME_DIR}/ssh-agent/${id}"
+  local socket="${socket_dir}/socket"
+
+  # Ensure directory are present
+  [ -d "$socket_dir" ] || \
+    mkdir -p "$socket_dir"
+
+
+  # Start the agent
+  rm "$socket" 2>/dev/null || true
+  export SSH_AUTH_SOCK=
+  export SSH_AGENT_PID=
+
+
+  #nohup ssh-agent -D -a "$socket" -t $life 2>&1 >$socket_dir/env &
+  # local pid=$(background ssh-agent -a "$socket" -t $life)
+  ssh-agent -a "$socket" -t $life |& grep 'SSH_'  > $socket_dir/env
+  source "$socket_dir/env"
+  
+  #echo "SSH_AUTH_SOCK=$socket"
+  #echo "SSH_AGENT_PID=$pid"
+
+  # >&2 echo  "PID=$pid"
+
+  # echo "SSH_AUTH_SOCK=$socket" > $socket_dir/env
+  # echo "SSH_AGENT_PID=$pid" >> $socket_dir/env
+
+  # # local pid=$!
+  # # ps aux | grep $pid >&2 
+
+  # # Wait for service to be started
+  # . $socket_dir/env > /dev/null
+  # until [ ! -z "${SSH_AUTH_SOCK:-}" ]; do
+  #   . $socket_dir/env > /dev/null
+  #   >&2 echo "WAiting socket .... "
+  #   sleep 3
+  # done
+
+  # # . $socket_dir/env
+  # >&2 jobs
+  # disown -ar
+  # >&2 jobs
+  # return
+
+  #local run_dir="${XDG_RUNTIME_DIR}/ssh-agent/${id}"
+
+  # Check if we can recover from previous instance
+  # idm_ssh__agent_clean $id "$run_dir/socket" 0 || true
+
+
+  # # Ensure env file is not present
+  # [ ! -f "${run_dir}/env" ] || \
+  #   rm -f "${run_dir}/env"
+  #   #set -x
+
+# DEVEL  # Start the agent
+# DEVEL  lib_log INFO "Start ssh-agent ..."
+# DEVEL  $IDM_DIR_ROOT/bin/start_ssh_agent.sh "$run_dir/socket" $life
+# DEVEL
+# DEVEL  # nohup ssh-agent -D -a "$run_dir/socket" -t $life
+# DEVEL  # export SSH_AGENT_PID=$!
+# DEVEL  export SSH_AUTH_SOCK="$socket"
+# DEVEL  echo "export SSH_AUTH_SOCK=$SSH_AUTH_SOCK" > "$run_dir/env"
+# DEVEL  echo "export SSH_AGENT_PID=$SSH_AGENT_PID" >> "$run_dir/env"
+# DEVEL  #echo "VALUE='$SSH_AUTH_SOCK $SSH_AGENT_PID'"
+
+
+  # if nohup ssh-agent -a "$socket" -t $life ; then
+  #   disown $pid
+  #   #source "$run_dir/env"
+  #   #cat "$run_dir/env"
+  #   export SSH_AUTH_SOCK="$socket"
+  #   lib_log INFO "Start ssh-agent ... ($pid)"
+  # else
+  #   lib_log WARN "Could not start ssh agent :("
+  #   return 1
+  # fi
 
 }
 
@@ -334,7 +416,6 @@ idm_ssh__agent_clean ()
 
   # We should kill all agents ....
   if [ "${pid}" == '0' ]; then
-    #set +x
     pid=$(grep -a "$socket" /proc/*/cmdline \
       | grep -a -v 'thread-self' \
       | strings -s' ' -1 \
@@ -343,7 +424,6 @@ idm_ssh__agent_clean ()
     #set -x
     pid="$( sed -E 's@/proc/([0-9]*)/.*@\1@' <<<"$pid" )"
   fi
-  #set -x
 
   # Remove process
   if [ ! -z "$pid" ]; then
@@ -430,56 +510,56 @@ idm_ssh_search_private_keys ()
 ## Deprecated functions
 ##########################################
 
-# Useless at this stage i guess 
-idm_ssh__agent_check ()
-{
-  #set -x
-  local id=$1
-  local socket=${2:-_}
-  local pid=${3:-0}
-
-  if [ "$socket" == '_' ] && [ "$pid" == '0' ] ; then
-    # Parameters are not valid, we assume ssh-agent is not launched at all
-    return 1
-  elif SSH_AUTH_SOCK=$socket SSH_AGENT_PID=$pid ssh-add -l &>/dev/null ; then
-    return 0
-  else
-    lib_log WARN "ssh-agent is not working as expected"
-  fi
-
-  # Is the socket valid ?
-  if [ "$socket" != '_' -a ! -S "$socket" ]; then
-    lib_log WARN "Socket '$socket' is dead, can't recover ssh-agent"
-    idm_ssh__agent_clean $id $socket 0
-    return 1
-  fi
-
-  if [ "$pid" != '0' -a "$pid" -lt 1 ]; then
-    local pid="$( ps aux | grep "$socket" | grep -v 'grep' | head -n 1 | awk '{ print $2 }' )" || \
-      pid="$( ps aux | grep "" | grep -v 'grep' | head -n 1 | awk '{ print $2 }' )" || \
-        {
-          lib_log WARN "Process ssh-agent is dead, cannot recover"
-          idm_ssh__agent_clean $id $socket 0
-          return 1
-        }
-
-    # Kill all processes
-    lib_log DEBUG "Multiple PID founds for ssh-agent: $pid"
-    q=0
-    for p in $pid; do
-      return
-      idm_ssh__agent_clean $id $socket $pid || true
-      q=1
-    done
-    [ "$q" -eq 0 ] || return 1
-
-  fi
-
-  # Ok, now we can try to recover the things
-
-
-  # Hmm, we should not arrive here ...
-  lib_log WARN "ssh-agent is in a really weird state :/"
-  return 1
-
-}
+### DEPRECATED # Useless at this stage i guess 
+### DEPRECATED idm_ssh__agent_check ()
+### DEPRECATED {
+### DEPRECATED   #set -x
+### DEPRECATED   local id=$1
+### DEPRECATED   local socket=${2:-_}
+### DEPRECATED   local pid=${3:-0}
+### DEPRECATED 
+### DEPRECATED   if [ "$socket" == '_' ] && [ "$pid" == '0' ] ; then
+### DEPRECATED     # Parameters are not valid, we assume ssh-agent is not launched at all
+### DEPRECATED     return 1
+### DEPRECATED   elif SSH_AUTH_SOCK=$socket SSH_AGENT_PID=$pid ssh-add -l &>/dev/null ; then
+### DEPRECATED     return 0
+### DEPRECATED   else
+### DEPRECATED     lib_log WARN "ssh-agent is not working as expected"
+### DEPRECATED   fi
+### DEPRECATED 
+### DEPRECATED   # Is the socket valid ?
+### DEPRECATED   if [ "$socket" != '_' -a ! -S "$socket" ]; then
+### DEPRECATED     lib_log WARN "Socket '$socket' is dead, can't recover ssh-agent"
+### DEPRECATED     idm_ssh__agent_clean $id $socket 0
+### DEPRECATED     return 1
+### DEPRECATED   fi
+### DEPRECATED 
+### DEPRECATED   if [ "$pid" != '0' -a "$pid" -lt 1 ]; then
+### DEPRECATED     local pid="$( ps aux | grep "$socket" | grep -v 'grep' | head -n 1 | awk '{ print $2 }' )" || \
+### DEPRECATED       pid="$( ps aux | grep "" | grep -v 'grep' | head -n 1 | awk '{ print $2 }' )" || \
+### DEPRECATED         {
+### DEPRECATED           lib_log WARN "Process ssh-agent is dead, cannot recover"
+### DEPRECATED           idm_ssh__agent_clean $id $socket 0
+### DEPRECATED           return 1
+### DEPRECATED         }
+### DEPRECATED 
+### DEPRECATED     # Kill all processes
+### DEPRECATED     lib_log DEBUG "Multiple PID founds for ssh-agent: $pid"
+### DEPRECATED     q=0
+### DEPRECATED     for p in $pid; do
+### DEPRECATED       return
+### DEPRECATED       idm_ssh__agent_clean $id $socket $pid || true
+### DEPRECATED       q=1
+### DEPRECATED     done
+### DEPRECATED     [ "$q" -eq 0 ] || return 1
+### DEPRECATED 
+### DEPRECATED   fi
+### DEPRECATED 
+### DEPRECATED   # Ok, now we can try to recover the things
+### DEPRECATED 
+### DEPRECATED 
+### DEPRECATED   # Hmm, we should not arrive here ...
+### DEPRECATED   lib_log WARN "ssh-agent is in a really weird state :/"
+### DEPRECATED   return 1
+### DEPRECATED 
+### DEPRECATED }

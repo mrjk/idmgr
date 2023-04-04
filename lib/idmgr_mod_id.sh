@@ -27,7 +27,7 @@ idm_id ()
 idm_id__disable()
 {
   # Disable internal variables
-  echo "unset SHELL_ID GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL" | lib_log CODE -
+  echo "unset SHELL_ID GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL" | lib_log CODE -
   idm_id_save_last_id _
 }
 
@@ -43,6 +43,8 @@ idm_id__enable ()
   echo "export SHELL_ID='${id}'"
   echo "export GIT_AUTHOR_NAME='${common_name:-$id}'"
   echo "export GIT_AUTHOR_EMAIL='${email}'"
+  echo "export GIT_COMMITTER_NAME='${common_name:-$id}'"
+  echo "export GIT_COMMITTER_EMAIL='${email}'"
 
   idm_id_save_last_id $id
 

@@ -34,7 +34,7 @@ idm_gpg__cheat ()
     sub: Public subkey
     fpr: Fingerprint
     grp: Keygrip
-    uid: Persona identification string
+    uid: Personal identification string
   Usage:
     S: Signing
     C: Certification
@@ -52,6 +52,7 @@ idm_gpg__cheat ()
 EOF
 
 # Notes:
+# ED25... : https://www.digitalneanderthal.com/post/gpg/
 # See uses cases: http://www.saminiir.com/establish-cryptographic-identity-using-gnupg/
 # Pass helper: https://github.com/avinson/gpg-helper
 
@@ -100,6 +101,7 @@ idm_gpg__enable ()
 
   # Export tty to the current shell
   echo "export GPG_TTY=$(tty)"
+  echo "export GNUPGHOME=$GNUPGHOME"
 }
 
 
@@ -197,7 +199,10 @@ idm_gpg__init ()
       envsubst < $IDM_DIR_ROOT/shell/gpg_gen.tpl > $IDM_DIR_CACHE/gpg_gen_$id
   )
 
+  echo $IDM_DIR_CACHE
+
   # Generate key
+  mkdir -p "$gpghome"
   gpg2 --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
   #gpg --verbose --batch --gen-key $IDM_DIR_CACHE/gpg_gen_$id
   #echo $?

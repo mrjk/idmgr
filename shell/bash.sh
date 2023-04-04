@@ -40,6 +40,7 @@ i_restore_last_id ()
   if [ -f "$state_file" ]; then
     local id=$(cat "$state_file")
     if ! [ -z "${id//_/}" ]; then
+      # BUG: Should not reload if already loaded !!!!
       >&2 echo "INFO: Auto enabling last id: $id"
       i enable $id
     fi
