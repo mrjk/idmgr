@@ -26,6 +26,11 @@ IDM_DATE='03/01/18'
 IDM_LICENSE='MIT'
 IDM_SCRIPT_NAME=idmgr
 
+# Ensure XDG vars
+XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-$HOME/.local/run}
+
+mkdir -p "$XDG_RUNTIME_DIR"
+
 # Global app variables
 IDM_BIN=${IDM_BIN:-$0}
 IDM_DIR_ROOT=${IDM_DIR_ROOT:-$( realpath "$(dirname $(realpath $0))/../" )}
