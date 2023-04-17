@@ -151,7 +151,9 @@ idm_core__shell ()
 
   echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
   echo "export IDM_DIR_ROOT='$IDM_DIR_ROOT'"
-  echo "IDM_SRC_WORDS='$IDM_SRC_WORDS $(lib_id_get_all_id | xargs)'"
+  #echo "IDM_SRC_WORDS='$IDM_SRC_WORDS $(lib_id_get_all_id | xargs)'"
+  echo "IDM_SRC_WORDS='$IDM_SRC_WORDS'"
+  echo "IDM_DIR_ID='$IDM_DIR_ID'"
 
   tail -n +2  $IDM_DIR_ROOT/shell/bash.sh
 }
