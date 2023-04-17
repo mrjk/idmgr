@@ -200,6 +200,7 @@ lib_id_get_all_config ()
 
 lib_id_get_all_id ()
 {
+  local id=
   for id in $( find $IDM_DIR_ID -type f -name '*.env' 2>/dev/null ); do                             
     id=${id%%\.env}
     echo "${id##*/}"
