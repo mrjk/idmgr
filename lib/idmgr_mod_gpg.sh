@@ -88,15 +88,20 @@ idm_gpg__enable ()
     unset GPG_AGENT_INFO
   fi
 
-  # Check if socket is present
-  if [ ! -S "${GPG_AGENT_INFO-}" ]; then
-    rm -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env"
-    idm_gpg_start $id
-  fi
+  if [[ "${IDM_NO_BG:-false}" == true ]] || [[ -n "${DIRENV_IN_ENVRC-}" ]] ; then
 
-  # Show config to source
-  if [ -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env" ]; then
-    cat "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env"
+    # Check if socket is present
+    if [ ! -S "${GPG_AGENT_INFO-}" ]; then
+      rm -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env"
+      idm_gpg_start $id
+    fi
+
+    # Show config to source
+    if [ -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env" ]; then
+      cat "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env"
+    fi
+  else
+    lib_log WARN "Start of gpg-agent background process disabled because of: IDM_NO_BG=${IDM_NO_BG:-false}"
   fi
 
   # Export tty to the current shell
