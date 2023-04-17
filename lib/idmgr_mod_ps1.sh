@@ -41,10 +41,10 @@ idm_ps1__enable ()
 
   # Detect is PS1_*FIX vars exists
   if [ "${PS1_PREFIX+x}" == x ]; then
-    >&2 echo "Suffixx: ${PS1_PREFIX+x}"
+    #>&2 echo "Prefix PS1_PREFIX: ${PS1_PREFIX+x}"
     idm_ps1__enable_suffix $@
   else
-    >&2 echo "Classic: ${PS1_PREFIX+x}"
+    #>&2 echo "Classic PS1: ${PS1_PREFIX+x}"
     idm_ps1__enable_raw $@
   fi
 
@@ -66,13 +66,20 @@ idm_ps1__enable_suffix ()
 {
   local id=${1}
   id="\033[0;34m($id)\033[00m"
-  echo "export PS1_PREFIX=\"$id $PS1_PREFIX\""
+  echo "export PS1_PREFIX=\"$id${PS1_PREFIX:+ $PS1_PREFIX}\""
 }
 
 idm_ps1__disable ()
 {
-  echo "export PS1=\"\${IDM_SHELL_PS1}\""
-  return
+  
+  # Detect is PS1_*FIX vars exists
+  if [ "${PS1_PREFIX+x}" == x ]; then
+    #>&2 echo "Prefix PS1_PREFIX: ${PS1_PREFIX+x}"
+    echo "unset PS1_PREFIX"
+  else
+    #>&2 echo "Classic PS1: ${PS1_PREFIX+x}"
+    echo "export PS1=\"\${IDM_SHELL_PS1}\""
+  fi
 }
 
 idm_ps1__kill () { idm_ps1__disable ${@-}; }
