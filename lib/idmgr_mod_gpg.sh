@@ -88,7 +88,7 @@ idm_gpg__enable ()
     unset GPG_AGENT_INFO
   fi
 
-  if [[ "${IDM_NO_BG:-false}" == true ]] || [[ -n "${DIRENV_IN_ENVRC-}" ]] ; then
+  if [[ "${IDM_NO_BG:-false}" != false ]] || [[ -n "${DIRENV_IN_ENVRC-}" ]] ; then
 
     # Check if socket is present
     if [ ! -S "${GPG_AGENT_INFO-}" ]; then
