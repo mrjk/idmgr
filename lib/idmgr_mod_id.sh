@@ -112,7 +112,6 @@ idm_id__show ()
 idm_id__ls ()
 {
   local active
-  #set -x
 
   for id in $(lib_id_get_all_id); do
 
@@ -132,6 +131,12 @@ idm_id__ls ()
       echo "$active:$id::::${common_name-} (${email-})"
     )
   done | column -t -s:  -o' ' #| lib_log DUMP -
+}
+
+# List all available IDs names
+idm_id__names ()
+{
+  lib_id_get_all_id | xargs
 }
 
 
@@ -206,6 +211,7 @@ idm_id__rm ()
 idm_id_save_last_id ()
 {
   local id=${1}
+  [[ "${IDM_LAST_ID_SAVE:-true}" == "true" ]] || return 0
   echo "$id" > "$IDM_DIR_CACHE/last_id"
 }
 
