@@ -80,6 +80,7 @@ idm_gpg__enable ()
 
   local id=${1}
   lib_id_has_config $id
+  idm_gpg_header $id
 
   # Source environment
   if [ -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env" ]; then
@@ -88,7 +89,9 @@ idm_gpg__enable ()
     unset GPG_AGENT_INFO
   fi
 
-  if [[ "${IDM_NO_BG:-false}" != false ]] || [[ -n "${DIRENV_IN_ENVRC-}" ]] ; then
+  if [[ "${IDM_NO_BG:-false}" == true ]] || [[ -n "${DIRENV_IN_ENVRC-}" ]] ; then
+    lib_log WARN "Start of gpg-agent background process disabled because of: IDM_NO_BG=${IDM_NO_BG-} or DIRENV_IN_ENVRC=${DIRENV_IN_ENVRC-}"
+  else
 
     # Check if socket is present
     if [ ! -S "${GPG_AGENT_INFO-}" ]; then
@@ -100,8 +103,6 @@ idm_gpg__enable ()
     if [ -f "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env" ]; then
       cat "${XDG_RUNTIME_DIR}/pgp-agent/${id}/env"
     fi
-  else
-    lib_log WARN "Start of gpg-agent background process disabled because of: IDM_NO_BG=${IDM_NO_BG:-false}"
   fi
 
   # Export tty to the current shell
