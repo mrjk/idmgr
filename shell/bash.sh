@@ -51,6 +51,13 @@ i_restore_last_id ()
 
   [[ "$IDM_LAST_ID_AUTOLOAD" == 'true' ]] || return 0
 
+  # Restore from SHELL_ID
+  if [[ -n "${SHELL_ID:-}" ]]; then
+    i enable $SHELL_ID
+    return 
+  fi
+
+  # Restore from last loaded shell
   local IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
   local state_file=$IDM_DIR_CACHE/last_id
   if [ -f "$state_file" ]; then

@@ -326,7 +326,7 @@ background() {
 idm_ssh__agent_start() {
   # local socket=$1
   local id=$1
-  local life=5d
+  local life=4w
 
   local socket_dir="${XDG_RUNTIME_DIR}/ssh-agent/${id}"
   local socket="${socket_dir}/socket"
