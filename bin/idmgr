@@ -240,6 +240,7 @@ idm_mod_order ()
         IDM_MOD_DEPS="$( tr ' ' '\n' <<<${IDM_MOD_DEPS} )"
 
         # Output
+        # TOCHECK? echo -e "$( xargs -I{} echo {} "$mod_name" <<<"$IDM_MOD_DEPS" )"
         echo -e "$( xargs -n1 -I{} echo {} "$mod_name" <<<"$IDM_MOD_DEPS" )"
       done | tsort | grep -v 'core' | xargs
     #)
