@@ -54,7 +54,7 @@ i_restore_last_id ()
   # Restore from SHELL_ID
   if [[ -n "${SHELL_ID:-}" ]]; then
     i enable $SHELL_ID
-    return 
+    return
   fi
 
   # Restore from last loaded shell
