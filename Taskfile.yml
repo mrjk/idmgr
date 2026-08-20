@@ -36,7 +36,7 @@ tasks:
     interactive: true
     cmds:
       - |
-        {{.CTR}} run -it {{.RUN_OPTS}} {{.IMAGE}} bash -x
+        {{.CTR}} run -it {{.RUN_OPTS}} {{.IMAGE}} bash 
 
   test:cmd:
     desc: Run a one-shot command in a throwaway container
