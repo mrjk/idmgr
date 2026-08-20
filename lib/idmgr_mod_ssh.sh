@@ -23,6 +23,8 @@ idm_ssh__help ()
   printf "  %-20s: %s\n" "ssh enable" "Enable agent"
   printf "  %-20s: %s\n" "ssh disable" "Disable agent"
   printf "  %-20s: %s\n" "ssh kill" "Kill agent"
+  printf "  %-20s: %s\n" "ssh install" "Add Include snippet to ~/.ssh/config"
+  printf "  %-20s: %s\n" "ssh uninstall" "Remove Include snippet from ~/.ssh/config"
 
 #  cat <<EOF
 #
@@ -152,6 +154,34 @@ idm_ssh__kill ()
   idm_ssh__disable $id
 
 
+}
+
+idm_ssh__install ()
+{
+  local ssh_dir="${HOME}/.ssh"
+  local ssh_config="${ssh_dir}/config"
+  local ssh_config_d="${ssh_dir}/config.d"
+  local dir
+
+  lib_log NOTICE "Installing ssh ..."
+
+  for dir in "$ssh_dir" "$ssh_config_d"; do
+    if [[ ! -d "$dir" ]]; then
+      mkdir -p "$dir"
+      chmod 700 "$dir"
+      lib_log INFO "Created dir $dir"
+    else
+      lib_log INFO "Dir $dir already present"
+    fi
+  done
+
+  printf 'Include ~/.ssh/config.d/*\n' | lib_snippet_add "$ssh_config" ssh begin
+}
+
+idm_ssh__uninstall ()
+{
+  lib_log NOTICE "Uninstalling ssh ..."
+  lib_snippet_rm "${HOME}/.ssh/config" ssh
 }
 
 

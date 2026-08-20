@@ -72,6 +72,9 @@ idm_core__help ()
   echo
   printf "  %-20s: %s\n" "activate" "Show bash activate code"
   printf "  %-20s: %s\n" "comp " "Show completion code"
+  echo
+  printf "  %-20s: %s\n" "install [all|name]" "Install config snippets"
+  printf "  %-20s: %s\n" "uninstall [all|name]" "Remove config snippets"
   echo 
   echo "Other commands:"
   printf "  %-20s: %s\n" "id " "List all id"
@@ -139,6 +142,67 @@ idm_core__kill ()
   lib_id_is_enabled $id
   idm_core_exec_mod $id __disable "Killing %s ..." $(idm_lib_order_get disable)
   lib_log NOTICE "Id $id has been safely killed"
+}
+
+
+idm_core_hook_each ()
+{
+  local cmd=$1
+  local id=$2
+  local target=${3:-all}
+
+  case "$target" in
+    all)
+      lib_log NOTICE "${cmd} all ..."
+      idm_core__${cmd}_bash "$id"
+      local mod
+      for mod in $(idm_lib_order_get enable); do
+        if [ "$(type -t idm_${mod}__${cmd})" = function ]; then
+          idm_${mod}__${cmd} "$id"
+        else
+          lib_log INFO "Skip $mod: no ${cmd} hook"
+        fi
+      done
+      ;;
+    bash)
+      idm_core__${cmd}_bash "$id"
+      ;;
+    *)
+      if [ "$(type -t idm_${target}__${cmd})" = function ]; then
+        idm_${target}__${cmd} "$id"
+      else
+        idm_exit 1 ERR "No ${cmd} hook for $target"
+      fi
+      ;;
+  esac
+}
+
+idm_core__install ()
+{
+  local id=$1
+  shift || true
+  idm_core_hook_each install "$id" "${1:-all}"
+}
+
+idm_core__uninstall ()
+{
+  local id=$1
+  shift || true
+  idm_core_hook_each uninstall "$id" "${1:-all}"
+}
+
+idm_core__install_bash ()
+{
+  local bashrc="${HOME}/.bashrc"
+  lib_log NOTICE "Installing bash ..."
+  printf 'eval "$( %q activate )"\n' "${IDM_BIN}" \
+    | lib_snippet_add "$bashrc" bash end
+}
+
+idm_core__uninstall_bash ()
+{
+  lib_log NOTICE "Uninstalling bash ..."
+  lib_snippet_rm "${HOME}/.bashrc" bash
 }
 
 
@@ -521,7 +585,7 @@ idm_core_init ()
 #  idm_lib_order_set cd 60 40 60
 
   idm_lib_order_set gpg 11 89 11
-  #idm_lib_order_set git 50 50 50
+  idm_lib_order_set git 50 50 50
   #idm_lib_order_set tomb 50 50 50
   #idm_lib_order_set gh 50 50 50
   #idm_lib_order_set gitea 50 50 50
@@ -570,6 +634,11 @@ idm_core_cli ()
       menu=core
       action=enable
       id=$1
+    elif [[ "$1" == "install" || "$1" == "uninstall" ]]; then
+      menu=core
+      action=$1
+      id=$shell_id
+      shift 1 && opt=${@} || true
     elif lib_id_has_config ${2-_} &>/dev/null ; then
       menu=core
       action=$1
