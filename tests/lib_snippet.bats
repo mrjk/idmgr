@@ -4,6 +4,7 @@ load helpers/load
 
 setup() {
   setup_idmgr_libs
+  mkdir -p "$BATS_TEST_TMPDIR/files"
   SNIPPET_FILE="$BATS_TEST_TMPDIR/files/target.conf"
 }
 
@@ -148,6 +149,7 @@ add_snippet() {
 }
 
 @test "lib_snippet_add creates a missing file and parent dir" {
+  SNIPPET_FILE="$BATS_TEST_TMPDIR/missing/nested/target.conf"
   [ ! -e "$SNIPPET_FILE" ]
   run add_snippet demo
   [ "$status" -eq 0 ]
@@ -168,9 +170,11 @@ add_snippet() {
 }
 
 @test "lib_snippet_add fails on empty stdin" {
-  mkdir -p "$(dirname "$SNIPPET_FILE")"
-  run bash -c 'printf "" | lib_snippet_add "$1" demo' _ "$SNIPPET_FILE"
+  add_empty() { printf '' | lib_snippet_add "$SNIPPET_FILE" demo; }
+  run add_empty
   [ "$status" -eq 1 ]
+  [[ "$output" == *"Empty snippet stdin"* ]]
+  [ ! -e "$SNIPPET_FILE" ]
 }
 
 @test "lib_snippet_has detects presence" {

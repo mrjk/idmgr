@@ -52,6 +52,18 @@ init_git_test_repo() {
   git --git-dir "$git_dir" --work-tree "$git_work_tree" init --quiet
 }
 
+setup_idmgr_install() {
+  setup_idmgr_libs
+  HOME="$BATS_TEST_TMPDIR/home"
+  export HOME
+  export XDG_CONFIG_HOME="$HOME/.config"
+  export XDG_CACHE_HOME="$HOME/.cache"
+  export XDG_RUNTIME_DIR="$HOME/.local/run"
+  mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
+  unset SHELL_ID
+  IDM_BIN="$IDM_DIR_ROOT/bin/idmgr"
+}
+
 setup_idmgr_ssh() {
   setup_idmgr_libs
   source "$IDM_DIR_ROOT/lib/idmgr_mod_ssh.sh"
