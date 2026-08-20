@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  CTR: docker
+  IMAGE: idmgr-test
+  MOUNT: /opt/idmgr
+  HOME_DIR: /tmp/idmgr-home
+  RUN_OPTS: >-
+    --rm
+    -v {{.TASKFILE_DIR}}:{{.MOUNT}}:ro
+    --tmpfs {{.HOME_DIR}}:exec,mode=1777
+    -e HOME={{.HOME_DIR}}
+    -e XDG_RUNTIME_DIR={{.HOME_DIR}}/.local/run
+    -w {{.HOME_DIR}}
+
+  # -e EDITOR=nano
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  test:image:
+    desc: Build the ephemeral test image
+    cmds:
+      - '{{.CTR}} build -t {{.IMAGE}} {{.TASKFILE_DIR}}'
+
+  test:
+    desc: Open a throwaway container with idmgr mounted read-only
+    aliases: [shell]
+    deps: [test:image]
+    interactive: true
+    cmds:
+      - |
+        {{.CTR}} run -it {{.RUN_OPTS}} {{.IMAGE}} bash -x
+
+  test:cmd:
+    desc: Run a one-shot command in a throwaway container
+    deps: [test:image]
+    interactive: true
+    cmds:
+      - '{{.CTR}} run {{.RUN_OPTS}} {{.IMAGE}} bash -lc {{.CLI_ARGS | quote}}'
+
+  test:run:
+    desc: Run the bats test suite in a throwaway container
+    deps: [test:image]
+    cmds:
+      - '{{.CTR}} run {{.RUN_OPTS}} {{.IMAGE}} bats {{.MOUNT}}/tests'
+
