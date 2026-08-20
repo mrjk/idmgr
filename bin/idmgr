@@ -40,7 +40,7 @@ IDM_DIR_ID=${IDM_DIR_ID:-$IDM_ID_ENV_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
-IDM_SRC_WORDS='enable disable kill shell quit e d k s q'
+IDM_SRC_WORDS='enable disable kill activate quit e d k a q'
 
 mkdir -p $IDM_ID_ENV_DIR $IDM_DIR_ID $IDM_DIR_CACHE
 
@@ -70,7 +70,7 @@ idm_core__help ()
   printf "  %-20s: %s\n" "disable [id]" "Disable id"
   printf "  %-20s: %s\n" "kill [id]" "Kill id and its processes"
   echo
-  printf "  %-20s: %s\n" "shell" "Show bash code"
+  printf "  %-20s: %s\n" "activate" "Show bash activate code"
   printf "  %-20s: %s\n" "comp " "Show completion code"
   echo 
   echo "Other commands:"
@@ -146,8 +146,13 @@ idm_core__kill ()
 ## Shell integration CLI commands
 ##########################################
 
-idm_core__shell ()
+# Activate for a given shell
+idm_core__activate ()
 {
+  local shell=${1-:${SHELL##*/}}
+
+  [[ -n "$shell" ]] || idm_exit 1 ERR "Missing shell name: bash, sh, zsh ..."
+  lib_log NOTICE "Activate shell: $shell"
 
   echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
   echo "export IDM_DIR_ROOT='$IDM_DIR_ROOT'"
@@ -438,7 +443,6 @@ idm_lib_order_set ()
 
 idm_lib_order_get ()
 {
-  #set +x
   local f=${1}
  # >&2 echo "fmt: ${IDM_LIB_TABLEFMT%%$f*}"
   #>&2 echo -e "\n>order: $f\n>table: $IDM_LIB_TABLE"
@@ -491,7 +495,6 @@ idm_lib_load ()
     fi
     
   done
- # set +x
 }
 
 
@@ -520,8 +523,8 @@ idm_core_init ()
   idm_lib_order_set gpg 11 89 11
   #idm_lib_order_set git 50 50 50
   #idm_lib_order_set tomb 50 50 50
-  idm_lib_order_set gh 50 50 50
-  idm_lib_order_set gitea 50 50 50
+  #idm_lib_order_set gh 50 50 50
+  #idm_lib_order_set gitea 50 50 50
 
   # Load external lib
   idm_lib_load lib
@@ -626,7 +629,7 @@ idm_core_cli ()
   fi
 
   # Dispatch
-  #lib_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
+  lib_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
   #set -x
   if  [ "$( type -t idm_${menu}__${action:-_} )" = function ]; then
     idm_${menu}__${action:-_} $id $opt

@@ -24,20 +24,20 @@ idm_ssh__help ()
   printf "  %-20s: %s\n" "ssh disable" "Disable agent"
   printf "  %-20s: %s\n" "ssh kill" "Kill agent"
 
-  cat <<EOF
-
-Documentation:
-
-You can create a new ssh key with the assistant:
-  i ssh new
-The you can add this key to your agent, it will ask you your key password:
-  i ssh add
-If you want to kill the agent:
-  i ssh rm
-If you want to delete your key files, simply run:
-  i ssh rm
-
-EOF
+#  cat <<EOF
+#
+#Documentation:
+#
+#You can create a new ssh key with the assistant:
+#  i ssh new
+#The you can add this key to your agent, it will ask you your key password:
+#  i ssh add
+#If you want to kill the agent:
+#  i ssh rm
+#If you want to delete your key files, simply run:
+#  i ssh rm
+#
+#EOF
   
 }
 
