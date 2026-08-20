@@ -44,3 +44,9 @@ tasks:
     interactive: true
     cmds:
       - '{{.CTR}} run {{.RUN_OPTS}} {{.IMAGE}} bash -lc {{.CLI_ARGS | quote}}'
+
+  test:run:
+    desc: Run the bats test suite in a throwaway container
+    deps: [test:image]
+    cmds:
+      - '{{.CTR}} run {{.RUN_OPTS}} {{.IMAGE}} bats {{.MOUNT}}/tests'
