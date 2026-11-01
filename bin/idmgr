@@ -597,7 +597,7 @@ idm_core_init ()
   idm_lib_order_set id 10 90 10
   idm_lib_order_set ssh 12 88 12
   idm_lib_order_set ps1 60 40 60
-  idm_lib_order_set alias 60 40 60
+  #idm_lib_order_set alias 60 40 60
 #  idm_lib_order_set cd 60 40 60
 
   idm_lib_order_set gpg 11 89 11
