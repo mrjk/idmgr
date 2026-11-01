@@ -20,6 +20,13 @@ tasks:
       - task --list
     silent: true
 
+  ci:
+    desc: Run library tests, the docs build, and the integration matrix
+    cmds:
+      - task: test:run
+      - task: docs:build
+      - task: test:matrix
+
   test:run:
     desc: Run library bats on the host
     cmds:
@@ -68,6 +75,11 @@ tasks:
             task test:integration DISTRO="$distro" IDM_USER="$idm_user"
           done
         done
+
+  docs:build:
+    internal: true
+    cmds:
+      - task -d "{{.TASKFILE_DIR}}/docs" build
 
   _compose:
     internal: true
