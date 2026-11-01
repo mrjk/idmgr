@@ -1,0 +1,7 @@
+{{ define "main" }}
+<article class="markdown book-article">
+  {{ with resources.Get "README.md" }}
+    {{ .Content | markdownify }}
+  {{ end }}
+</article>
+{{ end }}

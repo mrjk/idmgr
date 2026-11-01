@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+tasks:
+  default:
+    desc: List documentation tasks
+    cmds:
+      - task --list
+    silent: true
+
+  serve:
+    desc: Serve the documentation site
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - mise exec -- hugo server --source {{.TASKFILE_DIR}} --bind 127.0.0.1
+
+  build:
+    desc: Build the documentation site
+    dir: '{{.TASKFILE_DIR}}/..'
+    cmds:
+      - mise exec -- hugo --source {{.TASKFILE_DIR}} --minify

@@ -1,0 +1,38 @@
+---
+description: idmgr layout, architecture, file index, and how to run tests
+alwaysApply: true
+---
+
+# Project map
+
+idmgr is a bash identity manager. Enable an id; modules print `export`/`unset` that the sourced wrapper `i` evals. Runtime config is outside the repo: `~/.config/idmgr/id/<id>.env` (optional `.secrets`). Cache: `~/.cache/idmgr`. Agents: `$XDG_RUNTIME_DIR`.
+
+Live shell path: `eval "$(idmgr activate)"` then `i enable <id>`. There is no `idmgr shell` command. `bin/idmgr.sh` is a symlink to `bin/idmgr`.
+
+CLI dispatch in `bin/idmgr` `idm_core_cli`: parse `menu` / `action` / `id`, call `idm_${menu}__${action}`. Module enable order is hardcoded in `idm_core_init` via `idm_lib_order_set` (not commented `IDM_MOD_*_DEPS`).
+
+## Index
+
+- `bin/idmgr`: CLI, loader, dispatch, `activate`/`install`/`fun`/`hier`
+- `lib/idmgr_lib_cli.sh`: `lib_log`, `lib_trace`, `lib_cli_timeout`
+- `lib/idmgr_lib_std.sh`: `lib_id_*`, git helpers, `lib_vars_load`
+- `lib/idmgr_lib_utils.sh`: `lib_require_bin`, dates, shred stub
+- `lib/idmgr_lib_snippet.sh`: marked-block install (`BEGIN/END idmgr:%s`); product code even if untracked
+- `lib/idmgr_mod_*.sh`: feature modules (see modules rule)
+- `shell/bash.sh`: activate payload (`i`, Ctrl-b disable, last-id autoload)
+- `shell/bash/startup.sh`: older alias loader; not what `activate` emits
+- `shell/gpg_gen.tpl`, `shell/gpg_conf`: gpg templates
+- `tests/*.bats` + `tests/helpers/load.bash`: library bats, run on the host
+- `tests/integration/*.bats`: scenario bats, run in a container
+- `Taskfile.yml`, `docker/Dockerfile`, `docker/compose.yml`, `mise.toml`
+- `docs/content/`: user docs. `docs/specs/`: architecture, behavior, rules. `docs/hugo.yaml`, `docs/Taskfile.yml`: site
+
+Ignore: `NOTES.md`, `iam.code-workspace`, `shell/OLD_*`, `bin/start_ssh_agent.sh`, missing `comp/` (still referenced by `idm_core__comp`).
+
+## Tests
+
+```
+task test:run
+```
+
+Library bats on the host (`bats tests/*.bats`). One container: `task test:integration` (`DISTRO=debian|centos|arch`, `IDM_USER=idmgr|root`). All six: `task test:matrix`. Interactive container: `task test` / `task test:cmd`.

@@ -1,0 +1,28 @@
+baseURL: http://localhost:1313/
+locale: en-us
+title: idmgr
+
+disableKinds:
+  - taxonomy
+  - term
+
+module:
+  mounts:
+    - source: content
+      target: content
+    - source: layouts
+      target: layouts
+    - source: ../README.md
+      target: assets/README.md
+  imports:
+    - path: github.com/alex-shpak/hugo-book
+
+params:
+  BookTheme: auto
+  BookToC: true
+  BookSection: /
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: false

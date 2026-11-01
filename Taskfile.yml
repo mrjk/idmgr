@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  CTR: docker
+  COMPOSE_FILE: docker/compose.yml
+  MOUNT: /opt/idmgr
+  DISTRO: '{{.DISTRO | default "debian"}}'
+  IDM_USER: '{{.IDM_USER | default "idmgr"}}'
+  BASE_debian: debian:bookworm-slim
+  BASE_centos: quay.io/centos/centos:stream9
+  BASE_arch: archlinux:latest
+  DISTRO_LIST: debian centos arch
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  ci:
+    desc: Run library tests, the docs build, and the integration matrix
+    cmds:
+      - task: test:run
+      - task: docs:build
+      - task: test:matrix
+
+  test:run:
+    desc: Run library bats on the host
+    cmds:
+      - bats tests/*.bats
+
+  test:image:
+    desc: Build the test image for DISTRO
+    cmds:
+      - task: _compose
+        vars:
+          COMPOSE_ARGS: build
+
+  test:
+    desc: Open a throwaway container with idmgr mounted read-only
+    aliases: [shell]
+    deps: [test:image]
+    interactive: true
+    cmds:
+      - task: _compose
+        vars:
+          COMPOSE_ARGS: run --rm -it test bash
+
+  test:cmd:
+    desc: Run a one-shot command in a throwaway container
+    deps: [test:image]
+    cmds:
+      - task: _compose
+        vars:
+          COMPOSE_ARGS: run --rm test bash -lc {{.CLI_ARGS | quote}}
+
+  test:integration:
+    desc: Run integration bats in one container
+    deps: [test:image]
+    cmds:
+      - task: _compose
+        vars:
+          COMPOSE_ARGS: run --rm test bats {{.MOUNT}}/tests/integration
+
+  test:matrix:
+    desc: Run integration bats on every distro as idmgr and root
+    cmds:
+      - |
+        set -euo pipefail
+        for distro in {{.DISTRO_LIST}}; do
+          for idm_user in idmgr root; do
+            task test:integration DISTRO="$distro" IDM_USER="$idm_user"
+          done
+        done
+
+  docs:build:
+    internal: true
+    cmds:
+      - task -d "{{.TASKFILE_DIR}}/docs" build
+
+  _compose:
+    internal: true
+    cmds:
+      - |
+        set -euo pipefail
+        case "{{.DISTRO}}" in
+          debian) base="{{.BASE_debian}}" ;;
+          centos) base="{{.BASE_centos}}" ;;
+          arch) base="{{.BASE_arch}}" ;;
+          *) echo "Unknown distro: {{.DISTRO}}" >&2; exit 1 ;;
+        esac
+        export IDMGR_BASE="$base"
+        export IDMGR_DISTRO="{{.DISTRO}}"
+        export IDMGR_USER="{{.IDM_USER}}"
+        {{.CTR}} compose -f "{{.TASKFILE_DIR}}/{{.COMPOSE_FILE}}" {{.COMPOSE_ARGS}}

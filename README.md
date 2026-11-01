@@ -1,48 +1,20 @@
+# idmgr
 
+idmgr loads one identity into the current shell. An identity is a name, a config file, and the ssh, gpg, git, and prompt state that name owns.
 
-## Quickstart
-There you go
+The program prints shell. It does not change the shell that started it. Load the `i` function, then enable an id:
+
+```bash
+eval "$(idmgr activate)"
+i enable Bank2000
 ```
-git clone
-cd idmgr
-eval "$( $PWD/bin/idmgr shell)"
+
+`idmgr install` writes that `eval` line into `~/.bashrc`. There is no `idmgr shell` command.
+
+Set `IDM_LAST_ID_AUTOLOAD=true` when a new shell should enable the last id on startup.
+
+Guides, configuration, and the command reference are in `docs/content/`. From a checkout:
+
+```bash
+task -d docs serve
 ```
-
-
-## Future doc
-
-Other scripts of interest to implement:
-
-* Pass mod:
-** Install firefox
-** Install Chromium
-* Encrypt mod:
-  * https://github.com/essentialkaos/mkcryptpasswd
-  * https://github.com/dyne/Tomb (Need root :( )
-  * https://github.com/nodesocket/cryptr => AES encyption, very nice
-  * https://github.com/vitalibarozzi/Flying-Tower , nice alt on upper link, best client !
-  * https://github.com/Tinram/GPGit Encrypt with gpg
-  * https://github.com/burianvlastimil/openssl-file-encryption-decryption-shell-scripts , aes256
-  * https://github.com/alexanderepstein/Bash-Snippets : many snippets
-  * https://github.com/elasticdog/transcrypt: Git transparent encryption , boaf, pk pas ...
-  * https://github.com/josh/senv :  Encrypt env variables
-  * https://github.com/abemassry/wsend-gpg: Send a file to a remote
-  * https://github.com/SixArm/gpg-encrypt : encrypt/decrypt
-  * https://github.com/rolandshoemaker/raziel : Encrypted auto installer, why not ?
-  * https://github.com/morishin/locker : Password file encryption, with edition possible, pretty cool
-  * https://github.com/windowsrefund/safe : Dir encrypter
-  * https://github.com/chadoe/luks-triple-unlock : unlock luks
-
-* Proactive sec:
-  * https://blog.kintoandar.com/2012/01/attack-detection-and-notification-with.html : iptables IDS
-
-* VPN modules:
-  * https://github.com/kintoandar/shell_scripts/blob/master/automation/vpn_ssh.sh
-  * ssh_rport
-
-* x509 mod:
-** pkictl
-* Backup:
-** https://github.com/ccztux/glsysbackup
-* Other scripts
-** https://github.com/tzhenghao/MagicSnippets

@@ -1,0 +1,40 @@
+---
+description: Bats test conventions, helpers, and isolation for idmgr
+globs: "tests/**/*.{bats,bash}"
+alwaysApply: false
+---
+
+# Tests
+
+Bats. Shared setup: `load helpers/load` then a `setup_idmgr_*` helper. Unit tests `source` libs; they do not exec `bin/idmgr` except `install.bats`.
+
+```bash
+#!/usr/bin/env bats
+
+load helpers/load
+
+setup() {
+  setup_idmgr_libs
+}
+
+@test "lib_log NOTICE writes a prefixed message to stderr" {
+  run lib_log NOTICE "hello idmgr"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NOTICE"* ]]
+}
+```
+
+## Helpers (`tests/helpers/load.bash`)
+
+- `setup_idmgr_libs`: tmp `IDM_DIR_ID`, source cli/utils/std/snippet
+- `setup_idmgr_install`: isolated `HOME` / `XDG_*`, sets `IDM_BIN`
+- `setup_idmgr_mod`: install isolation plus `IDM_CONFIG_DIR` / `IDM_DIR_CACHE`, then source one module
+- `setup_idmgr_integration`: paths the `bin/idmgr` process reads, under the bats temp home
+- `setup_idmgr_ssh`: sources ssh mod; always `teardown_ssh_agent` in teardown
+- `write_id_env`, `write_ssh_keypair`, `init_git_test_repo`
+
+Isolate `HOME`, `XDG_*`, and `IDM_DIR_ID` under `BATS_TEST_TMPDIR`. Do not touch the developer's real config.
+
+`lib_log` writes to stderr; bats `run` captures that in `$output`. Library files cover cli, utils, std, snippet, ssh, install, git, gpg, and pass. `tests/integration/` execs `bin/idmgr` for install, enable, ssh agent ownership, git init, and pass. It does not repeat the library assertions.
+
+`task test:run` runs `bats tests/*.bats` on the host. `bats` recurses, so a bare `bats tests` also runs integration. Container scenarios: `task test:integration`. Every distro and both users: `task test:matrix`.

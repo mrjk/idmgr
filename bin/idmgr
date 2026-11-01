@@ -36,11 +36,12 @@ IDM_BIN=${IDM_BIN:-$0}
 IDM_DIR_ROOT=${IDM_DIR_ROOT:-$( realpath "$(dirname $(realpath $0))/../" )}
 
 IDM_ID_ENV_DIR=${IDM_ID_ENV_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
+IDM_CONFIG_DIR=${IDM_CONFIG_DIR:-$IDM_ID_ENV_DIR}
 IDM_DIR_ID=${IDM_DIR_ID:-$IDM_ID_ENV_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
 
-IDM_SRC_WORDS='enable disable kill shell quit e d k s q'
+IDM_SRC_WORDS='enable disable kill activate quit e d k a q'
 
 mkdir -p $IDM_ID_ENV_DIR $IDM_DIR_ID $IDM_DIR_CACHE
 
@@ -70,8 +71,12 @@ idm_core__help ()
   printf "  %-20s: %s\n" "disable [id]" "Disable id"
   printf "  %-20s: %s\n" "kill [id]" "Kill id and its processes"
   echo
-  printf "  %-20s: %s\n" "shell" "Show bash code"
+  printf "  %-20s: %s\n" "activate" "Show bash activate code"
+  printf "  %-20s: %s\n" "bash status" "Show activated/installed flags"
   printf "  %-20s: %s\n" "comp " "Show completion code"
+  echo
+  printf "  %-20s: %s\n" "install [all|name]" "Install config snippets"
+  printf "  %-20s: %s\n" "uninstall [all|name]" "Remove config snippets"
   echo 
   echo "Other commands:"
   printf "  %-20s: %s\n" "id " "List all id"
@@ -142,12 +147,93 @@ idm_core__kill ()
 }
 
 
+idm_core_hook_each ()
+{
+  local cmd=$1
+  local id=$2
+  local target=${3:-all}
+
+  case "$target" in
+    all)
+      lib_log NOTICE "${cmd} all ..."
+      idm_core__${cmd}_bash "$id"
+      local mod
+      for mod in $(idm_lib_order_get enable); do
+        if [ "$(type -t idm_${mod}__${cmd})" = function ]; then
+          idm_${mod}__${cmd} "$id" ||
+            lib_log WARN "Module $mod ${cmd} failed"
+        else
+          lib_log INFO "Skip $mod: no ${cmd} hook"
+        fi
+      done
+      ;;
+    bash)
+      idm_core__${cmd}_bash "$id"
+      ;;
+    *)
+      if [ "$(type -t idm_${target}__${cmd})" = function ]; then
+        idm_${target}__${cmd} "$id"
+      else
+        idm_exit 1 ERR "No ${cmd} hook for $target"
+      fi
+      ;;
+  esac
+}
+
+idm_core__install ()
+{
+  local id=$1
+  shift || true
+  idm_core_hook_each install "$id" "${1:-all}"
+}
+
+idm_core__uninstall ()
+{
+  local id=$1
+  shift || true
+  idm_core_hook_each uninstall "$id" "${1:-all}"
+}
+
+idm_core__install_bash ()
+{
+  local bashrc="${HOME}/.bashrc"
+  lib_log NOTICE "Installing bash ..."
+  printf 'eval "$( %q activate )"\n' "${IDM_BIN}" \
+    | lib_snippet_add "$bashrc" bash end
+}
+
+idm_core__uninstall_bash ()
+{
+  lib_log NOTICE "Uninstalling bash ..."
+  lib_snippet_rm "${HOME}/.bashrc" bash
+}
+
+idm_bash__status ()
+{
+  local env_state=deactivated
+  local install_state=uninstalled
+  [[ -v IDM_SHELL_PS1 ]] && env_state=activated
+  lib_snippet_has "${HOME}/.bashrc" bash && install_state=installed
+  printf '%s,%s\n' "$env_state" "$install_state"
+}
+
+
 
 ## Shell integration CLI commands
 ##########################################
 
-idm_core__shell ()
+# Activate for a given shell
+idm_core__activate ()
 {
+  local shell=${1-:${SHELL##*/}}
+  local flags
+
+  [[ -n "$shell" ]] || idm_exit 1 ERR "Missing shell name: bash, sh, zsh ..."
+  flags=$(idm_bash__status)
+  if [[ "$flags" == *,uninstalled ]]; then
+    lib_log WARN "bash is not configured"
+  fi
+  lib_log NOTICE "Activate shell: $shell"
 
   echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
   echo "export IDM_DIR_ROOT='$IDM_DIR_ROOT'"
@@ -438,7 +524,6 @@ idm_lib_order_set ()
 
 idm_lib_order_get ()
 {
-  #set +x
   local f=${1}
  # >&2 echo "fmt: ${IDM_LIB_TABLEFMT%%$f*}"
   #>&2 echo -e "\n>order: $f\n>table: $IDM_LIB_TABLE"
@@ -491,7 +576,6 @@ idm_lib_load ()
     fi
     
   done
- # set +x
 }
 
 
@@ -518,10 +602,10 @@ idm_core_init ()
 #  idm_lib_order_set cd 60 40 60
 
   idm_lib_order_set gpg 11 89 11
-  #idm_lib_order_set git 50 50 50
+  idm_lib_order_set git 50 50 50
   #idm_lib_order_set tomb 50 50 50
-  idm_lib_order_set gh 50 50 50
-  idm_lib_order_set gitea 50 50 50
+  #idm_lib_order_set gh 50 50 50
+  #idm_lib_order_set gitea 50 50 50
 
   # Load external lib
   idm_lib_load lib
@@ -567,6 +651,11 @@ idm_core_cli ()
       menu=core
       action=enable
       id=$1
+    elif [[ "$1" == "install" || "$1" == "uninstall" ]]; then
+      menu=core
+      action=$1
+      id=$shell_id
+      shift 1 && opt=${@} || true
     elif lib_id_has_config ${2-_} &>/dev/null ; then
       menu=core
       action=$1
@@ -626,7 +715,7 @@ idm_core_cli ()
   fi
 
   # Dispatch
-  #lib_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
+  lib_log DEBUG "menu=$menu action=${action:-_} id=$id opt=$opt"
   #set -x
   if  [ "$( type -t idm_${menu}__${action:-_} )" = function ]; then
     idm_${menu}__${action:-_} $id $opt
