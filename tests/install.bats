@@ -80,3 +80,48 @@ setup() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"No install hook for gpg"* ]]
 }
+
+@test "idmgr bash status is deactivated,uninstalled by default" {
+  unset IDM_SHELL_PS1
+  run "$IDM_BIN" bash status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"deactivated,uninstalled"* ]]
+}
+
+@test "idmgr bash status is deactivated,installed after install" {
+  unset IDM_SHELL_PS1
+  "$IDM_BIN" install bash
+  run "$IDM_BIN" bash status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"deactivated,installed"* ]]
+}
+
+@test "idmgr bash status is activated when IDM_SHELL_PS1 is set" {
+  export IDM_SHELL_PS1="test"
+  run "$IDM_BIN" bash status
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"activated,uninstalled"* ]]
+}
+
+@test "idmgr activate warns when bash is uninstalled" {
+  run "$IDM_BIN" activate
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bash is not configured"* ]]
+}
+
+@test "idmgr activate stays quiet when bash is installed" {
+  "$IDM_BIN" install bash
+  run "$IDM_BIN" activate
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"bash is not configured"* ]]
+}
+
+@test "idmgr git ls does not crash when IDM_CONFIG_DIR is unset" {
+  mkdir -p "$HOME/.config/idmgr/id"
+  printf 'email=test@example.com\n' > "$HOME/.config/idmgr/id/alice.env"
+  export SHELL_ID=alice
+  unset IDM_CONFIG_DIR
+  run "$IDM_BIN" git ls
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"unbound variable"* ]]
+}

@@ -15,6 +15,7 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"Secure Shell"* ]]
   [[ "$output" == *"ssh add"* ]]
+  [[ "$output" == *"ssh status"* ]]
 }
 
 @test "idm_ssh with one argument lists keys" {
@@ -133,4 +134,41 @@ teardown() {
   run idm_ssh__tree alice
   [ "$status" -eq 0 ]
   [[ "$output" == *"alice_ed25519"* ]]
+}
+
+@test "idm_ssh__status is deactivated,uninstalled by default" {
+  run idm_ssh__status alice
+  [ "$status" -eq 0 ]
+  [ "$output" = "deactivated,uninstalled" ]
+}
+
+@test "idm_ssh__status is deactivated,installed after install" {
+  idm_ssh__install
+  run idm_ssh__status alice
+  [ "$status" -eq 0 ]
+  [ "$output" = "deactivated,installed" ]
+}
+
+@test "idm_ssh__status is activated when SSH_AUTH_SOCK is set" {
+  SSH_AUTH_SOCK=/tmp/fake.sock
+  run idm_ssh__status alice
+  [ "$status" -eq 0 ]
+  [ "$output" = "activated,uninstalled" ]
+}
+
+@test "idm_ssh__enable warns when ssh is uninstalled" {
+  write_id_env alice
+  IDM_NO_BG=true
+  run idm_ssh__enable alice
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ssh is not configured"* ]]
+}
+
+@test "idm_ssh__enable stays quiet when ssh is installed" {
+  write_id_env alice
+  idm_ssh__install
+  IDM_NO_BG=true
+  run idm_ssh__enable alice
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"ssh is not configured"* ]]
 }

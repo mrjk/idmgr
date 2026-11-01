@@ -36,6 +36,7 @@ IDM_BIN=${IDM_BIN:-$0}
 IDM_DIR_ROOT=${IDM_DIR_ROOT:-$( realpath "$(dirname $(realpath $0))/../" )}
 
 IDM_ID_ENV_DIR=${IDM_ID_ENV_DIR:-${XDG_CONFIG_HOME:-~/.config}/idmgr}
+IDM_CONFIG_DIR=${IDM_CONFIG_DIR:-$IDM_ID_ENV_DIR}
 IDM_DIR_ID=${IDM_DIR_ID:-$IDM_ID_ENV_DIR/id}
 IDM_DIR_LIB=${IDM_DIR_LIB:-$IDM_DIR_ROOT/lib}
 IDM_DIR_CACHE=${IDM_DIR_CACHE:-${XDG_CACHE_HOME:-~/.cache}/idmgr}
@@ -71,6 +72,7 @@ idm_core__help ()
   printf "  %-20s: %s\n" "kill [id]" "Kill id and its processes"
   echo
   printf "  %-20s: %s\n" "activate" "Show bash activate code"
+  printf "  %-20s: %s\n" "bash status" "Show activated/installed flags"
   printf "  %-20s: %s\n" "comp " "Show completion code"
   echo
   printf "  %-20s: %s\n" "install [all|name]" "Install config snippets"
@@ -205,6 +207,15 @@ idm_core__uninstall_bash ()
   lib_snippet_rm "${HOME}/.bashrc" bash
 }
 
+idm_bash__status ()
+{
+  local env_state=deactivated
+  local install_state=uninstalled
+  [[ -v IDM_SHELL_PS1 ]] && env_state=activated
+  lib_snippet_has "${HOME}/.bashrc" bash && install_state=installed
+  printf '%s,%s\n' "$env_state" "$install_state"
+}
+
 
 
 ## Shell integration CLI commands
@@ -214,8 +225,13 @@ idm_core__uninstall_bash ()
 idm_core__activate ()
 {
   local shell=${1-:${SHELL##*/}}
+  local flags
 
   [[ -n "$shell" ]] || idm_exit 1 ERR "Missing shell name: bash, sh, zsh ..."
+  flags=$(idm_bash__status)
+  if [[ "$flags" == *,uninstalled ]]; then
+    lib_log WARN "bash is not configured"
+  fi
   lib_log NOTICE "Activate shell: $shell"
 
   echo "export IDM_BIN=${IDM_BIN:-$IDM_DIR_ROOT/bin/idmgr}"
