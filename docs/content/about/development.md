@@ -38,23 +38,19 @@ task -d docs serve
 task -d docs build
 ```
 
-`serve` and `build` run `mise exec -- hugo` so the binary is the one pinned in `mise.toml`. `build` writes `docs/public/`. That directory is gitignored. The docs taskfile is not included from the root `Taskfile.yml`. The root `ci` task calls `task -d docs build` without including that file.
+`serve` and `build` run `mise exec -- hugo` so the binary is the one pinned in `mise.toml`. `build` writes `docs/public/`. That directory is gitignored. `BASE_URL` defaults to `http://localhost:1313/`. The docs taskfile is not included from the root `Taskfile.yml`. The root `ci` task calls `task -d docs build` without including that file.
 
 Command help and the variable tables in the reference are written by hand. `--help` does not emit usable module help, and config keys are not declared in one place, so there is no extract step that rewrites `content/`.
 
 ## CI
 
-`task ci` runs the library bats, the docs build, and `test:matrix`, in that order.
+`task ci` runs the library bats, the docs build, and `test:matrix`, in that order. It does not publish the site.
 
-GitHub Actions runs those same three commands as separate jobs. Each job checks out the repo, installs the tools named in `mise.toml`, and runs one task. The workflow does not name bats, hugo, docker, or a distro.
+GitHub Actions splits that into two workflows. A test or build job checks out the repo, installs the tools named in `mise.toml`, and runs one task. Both workflows can be started from the Actions tab with Run workflow.
 
-Jobs in `.github/workflows/ci.yml`:
+`.github/workflows/test.yml` runs on push, pull request, and dispatch. Push and pull request run both jobs. The dispatch form chooses `all`, `library` (`task test:run`), or `integration` (`task test:matrix`).
 
-- library: `task test:run`
-- integration: `task test:matrix`
-- documentation: `task -d docs build`
-
-The three jobs run in parallel. `task ci` runs the same commands one after another.
+`.github/workflows/docs.yml` runs `task -d docs build` on push, pull request, and dispatch. Run workflow also publishes `docs/public/` to GitHub Pages, using the Pages site address as `BASE_URL`. Push and pull request only check that the site builds. The repository Pages source has to be GitHub Actions. The deploy step is the Pages publish action. The build step is the task.
 
 ## License
 

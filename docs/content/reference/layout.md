@@ -13,7 +13,7 @@ The repository is the program. Identity data stays in the home directory.
 
 `shell/bash.sh` is the payload `activate` prints: the `i` function, Ctrl-b, and last-id autoload. `shell/bash/startup.sh` is an older alias loader and is not part of that payload. `shell/gpg_gen.tpl` and `shell/gpg_conf` are gpg templates.
 
-`tests/` is the bats suite. `Taskfile.yml` builds a throwaway image and runs it. `task ci` runs the library bats, the docs build, and the integration matrix. `.github/workflows/ci.yml` runs those same tasks on GitHub: each job installs the mise tools and calls one task. `mise.toml` provides bats, hugo, and task. `docs/content/` is this site. `docs/specs/` is the product spec: architecture, behavior, and the rules the code follows.
+`tests/` is the bats suite. `Taskfile.yml` builds a throwaway image and runs it. `task ci` runs the library bats, the docs build, and the integration matrix. `.github/workflows/test.yml` runs the test tasks. `.github/workflows/docs.yml` builds the site and, when started from the Actions tab, publishes it to GitHub Pages. Each build job installs the mise tools and calls one task. `mise.toml` provides bats, hugo, and task. `docs/content/` is this site. `docs/specs/` is the product spec: architecture, behavior, and the rules the code follows.
 
 ## Home directory
 

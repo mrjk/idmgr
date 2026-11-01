@@ -19,4 +19,4 @@ tasks:
     desc: Build the documentation site
     dir: '{{.TASKFILE_DIR}}/..'
     cmds:
-      - mise exec -- hugo --source {{.TASKFILE_DIR}} --minify
+      - mise exec -- hugo --source {{.TASKFILE_DIR}} --minify --baseURL {{.BASE_URL | default "http://localhost:1313/" | quote}}
