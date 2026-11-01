@@ -46,3 +46,15 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"1h"* ]]
 }
+
+@test "lib_date_diff_human reports an empty span as nothing" {
+  run lib_date_diff_human 0 0
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "lib_date_diff_human reports a one day span" {
+  run lib_date_diff_human 0 86400
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"1d"* ]]
+}

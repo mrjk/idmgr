@@ -22,8 +22,9 @@ CLI dispatch in `bin/idmgr` `idm_core_cli`: parse `menu` / `action` / `id`, call
 - `shell/bash.sh`: activate payload (`i`, Ctrl-b disable, last-id autoload)
 - `shell/bash/startup.sh`: older alias loader; not what `activate` emits
 - `shell/gpg_gen.tpl`, `shell/gpg_conf`: gpg templates
-- `tests/*.bats` + `tests/helpers/load.bash`
-- `Taskfile.yml`, `Dockerfile`, `mise.toml`
+- `tests/*.bats` + `tests/helpers/load.bash`: library bats, run on the host
+- `tests/integration/*.bats`: scenario bats, run in a container
+- `Taskfile.yml`, `docker/Dockerfile`, `docker/compose.yml`, `mise.toml`
 - `docs/content/`: user docs. `docs/specs/`: architecture, behavior, rules. `docs/hugo.yaml`, `docs/Taskfile.yml`: site
 
 Ignore: `NOTES.md`, `iam.code-workspace`, `shell/OLD_*`, `bin/start_ssh_agent.sh`, missing `comp/` (still referenced by `idm_core__comp`).
@@ -34,4 +35,4 @@ Ignore: `NOTES.md`, `iam.code-workspace`, `shell/OLD_*`, `bin/start_ssh_agent.sh
 task test:run
 ```
 
-Interactive: `task test` / `task test:cmd`. Local: `bats tests`.
+Library bats on the host (`bats tests/*.bats`). One container: `task test:integration` (`DISTRO=debian|centos|arch`, `IDM_USER=idmgr|root`). All six: `task test:matrix`. Interactive container: `task test` / `task test:cmd`.

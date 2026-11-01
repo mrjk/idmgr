@@ -49,6 +49,12 @@ setup() {
   [[ "$output" == *"from-stdin"* ]]
 }
 
+@test "lib_cli_timeout returns the default code when read times out" {
+  export -f lib_cli_timeout
+  run bash -c 'sleep 3 | lib_cli_timeout 3 1'
+  [ "$status" -eq 3 ]
+}
+
 @test "lib_trace dumps a stack trace" {
   run lib_trace "ctx-msg"
   [ "$status" -eq 0 ]

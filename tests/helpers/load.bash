@@ -1,11 +1,24 @@
-# Shared bats setup for library tests.
+# Shared bats setup for library and integration tests.
+
+idmgr_repo_root() {
+  local dir=$1
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/bin/idmgr" ]; then
+      (cd "$dir" && pwd)
+      return 0
+    fi
+    dir=$(dirname "$dir")
+  done
+  echo "idmgr repo root not found from $1" >&2
+  return 1
+}
 
 setup_idmgr_std() {
   setup_idmgr_libs
 }
 
 setup_idmgr_libs() {
-  IDM_DIR_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  IDM_DIR_ROOT="$(idmgr_repo_root "$BATS_TEST_DIRNAME")"
   IDM_DIR_ID="$BATS_TEST_TMPDIR/id"
   mkdir -p "$IDM_DIR_ID"
 
@@ -62,6 +75,44 @@ setup_idmgr_install() {
   mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
   unset SHELL_ID
   IDM_BIN="$IDM_DIR_ROOT/bin/idmgr"
+}
+
+setup_idmgr_mod() {
+  local mod=$1
+  setup_idmgr_install
+  export IDM_CONFIG_DIR="$BATS_TEST_TMPDIR/config"
+  export IDM_DIR_CACHE="$BATS_TEST_TMPDIR/cache"
+  mkdir -p "$IDM_CONFIG_DIR" "$IDM_DIR_CACHE" "$XDG_RUNTIME_DIR"
+  # shellcheck disable=SC1090
+  source "$IDM_DIR_ROOT/lib/$mod"
+  unset IDM_NO_BG DIRENV_IN_ENVRC
+
+  idm_exit() {
+    local rc=${1:-0}
+    local lvl=DEBUG
+    local msg=
+    if [ "$#" -eq 3 ]; then
+      lvl=$2
+      msg=${3-}
+    else
+      msg=${2-}
+    fi
+    if [ "$rc" -ne 0 ]; then
+      lib_log "$lvl" "$msg (rc=$rc)"
+    else
+      lib_log "$lvl" "$msg"
+    fi
+    exit "$rc"
+  }
+}
+
+setup_idmgr_integration() {
+  setup_idmgr_install
+  export IDM_ID_ENV_DIR="$XDG_CONFIG_HOME/idmgr"
+  export IDM_CONFIG_DIR="$IDM_ID_ENV_DIR"
+  export IDM_DIR_ID="$IDM_ID_ENV_DIR/id"
+  export IDM_DIR_CACHE="$XDG_CACHE_HOME/idmgr"
+  mkdir -p "$IDM_DIR_ID" "$IDM_DIR_CACHE" "$XDG_RUNTIME_DIR"
 }
 
 setup_idmgr_ssh() {

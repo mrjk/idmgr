@@ -289,10 +289,10 @@ lib_git_is_repo_with_commits ()
   lib_git_is_repo $var_env ||
     return $?
 
-  find "$git_dir" -type f &>/dev/null || {
-      lib_log "Repository have no commits"
-      return $?
-    }
+  lib_git "$var_env" rev-parse --verify HEAD &>/dev/null || {
+    lib_log INFO "Repository have no commits"
+    return 1
+  }
 }
 
 lib_git_is_all_commited ()

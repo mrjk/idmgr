@@ -1,0 +1,19 @@
+services:
+  test:
+    image: idmgr-test:${IDMGR_DISTRO:-debian}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: test
+      args:
+        BASE: ${IDMGR_BASE:-debian:bookworm-slim}
+    user: ${IDMGR_USER:-idmgr}
+    volumes:
+      - ..:/opt/idmgr:ro
+    tmpfs:
+      - /tmp/idmgr-home:exec,mode=1777
+    working_dir: /tmp/idmgr-home
+    environment:
+      HOME: /tmp/idmgr-home
+      XDG_RUNTIME_DIR: /tmp/idmgr-home/.local/run
+    command: ["bats", "/opt/idmgr/tests/integration"]

@@ -9,23 +9,21 @@ Install the tools named in `mise.toml`, from the repository root:
 mise install
 ```
 
-That provides bats, hugo, and task. The site tasks call that hugo through `mise exec`. Task runs the test image.
+That provides bats, hugo, and task. The site tasks call that hugo through `mise exec`.
 
 ## Tests
 
-`task test:run` builds the image from `Dockerfile` and runs `bats tests` inside it. The image is a dev and test image for a sourced shell tool.
+`task test:run` runs the library bats on the host (`bats tests/*.bats`). Integration scenarios run in the image under `docker/`:
 
 ```bash
 task test:run
+task test:integration
+task test:matrix
 ```
 
-`task test` opens a shell in a throwaway container with the tree mounted read-only. `task test:cmd -- <command>` runs one command in that container.
+`task test:integration` defaults to Debian as the `idmgr` user. `DISTRO` is `debian`, `centos`, or `arch`. `IDM_USER` is `idmgr` or `root`. `task test:matrix` runs all six. `task test` opens a shell in a throwaway container with the tree mounted read-only. `task test:cmd -- <command>` runs one command in that container.
 
-On the host, with bats available:
-
-```bash
-bats tests
-```
+`bats` recurses, so `bats tests` on the host also runs `tests/integration`. The local task does not.
 
 Tests isolate `HOME`, `XDG_*`, and `IDM_DIR_ID` under the bats temp directory. They do not read the developer's real idmgr config.
 

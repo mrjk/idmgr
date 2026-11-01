@@ -160,7 +160,8 @@ idm_core_hook_each ()
       local mod
       for mod in $(idm_lib_order_get enable); do
         if [ "$(type -t idm_${mod}__${cmd})" = function ]; then
-          idm_${mod}__${cmd} "$id"
+          idm_${mod}__${cmd} "$id" ||
+            lib_log WARN "Module $mod ${cmd} failed"
         else
           lib_log INFO "Skip $mod: no ${cmd} hook"
         fi

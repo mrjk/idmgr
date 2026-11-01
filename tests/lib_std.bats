@@ -221,6 +221,12 @@ EOF
 
   init_git_test_repo
   run lib_git_is_repo_with_commits test
+  [ "$status" -eq 1 ]
+
+  git --git-dir "$git_dir" --work-tree "$git_work_tree" \
+    -c user.email=test@example.com -c user.name=test \
+    commit --allow-empty -m init --quiet
+  run lib_git_is_repo_with_commits test
   [ "$status" -eq 0 ]
 }
 
